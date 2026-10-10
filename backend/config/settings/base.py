@@ -74,6 +74,7 @@ LOCAL_APPS = [
     "core",
     "security",
     "instruments",
+    "market_data",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -338,6 +339,26 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = "UTC"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
+
+# =============================================================================
+# MARKET DATA — Phase 1 (free tier)
+# Yahoo is the default because it needs ZERO keys. Angel One's public
+# master is also keyless; only Angel QUOTES need credentials (absent today
+# by the user's choice, wired for later). Every value has a safe default
+# so CI and fresh clones work with no .env entries for these.
+# =============================================================================
+MARKET_DATA_PROVIDER = config("MARKET_DATA_PROVIDER", default="yahoo")
+POLL_INTERVAL_SECONDS = config("POLL_INTERVAL_SECONDS", default=60, cast=int)
+STALE_TICK_SECONDS = config("STALE_TICK_SECONDS", default=900, cast=int)
+DATA_GAP_SECONDS = config("DATA_GAP_SECONDS", default=300, cast=int)
+BAD_TICK_RATIO_ALERT = config("BAD_TICK_RATIO_ALERT", default="0.05")
+YAHOO_TIMEOUT_SECONDS = config("YAHOO_TIMEOUT_SECONDS", default=15.0, cast=float)
+# Angel One (optional today; required only for Angel quotes/websocket).
+# Kept empty by default — MissingCredentials explains exactly what to set.
+ANGEL_API_KEY = config("ANGEL_API_KEY", default="")
+ANGEL_CLIENT_ID = config("ANGEL_CLIENT_ID", default="")
+ANGEL_PASSWORD = config("ANGEL_PASSWORD", default="")
+ANGEL_TOTP_SECRET = config("ANGEL_TOTP_SECRET", default="")
 
 # =============================================================================
 # SENTRY (Error Tracking)

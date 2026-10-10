@@ -56,12 +56,39 @@ docker-compose up --build
 │   ├── core/                # Domain models, clock, enums, types, migrations
 │   ├── security/            # Auth, permissions, middleware, throttles
 │   ├── instruments/         # Instrument master loader + services
-│   ├── tests/               # 320 pytest tests
+│   ├── market_data/         # Phase 1: ticks, candles, providers, ingestion, quality
+│   │   ├── providers/       # yahoo (keyless) + angel (keyless master, keyed quotes)
+│   │   └── management/commands/  # poll_prices, backfill_history, sync_master, data_quality_report
+│   ├── tests/               # 393 pytest tests (73 for market data)
 │   └── requirements/        # base.txt / prod.txt / dev.txt (pinned)
 ├── docker/                  # Dockerfiles
 ├── .github/workflows/ci.yml # CI: lint, bandit, pip-audit, secrets, tests, deploy checks
 ├── pyproject.toml           # ruff / mypy / bandit / pytest / coverage config
 └── engine/  frontend/       # Phase 2+ (not yet created)
+```
+
+## Market Data (Phase 1 — free tier, zero keys)
+
+No paid Kite Connect. No keys in `.env` required today:
+
+| Provider | Keys? | What it gives |
+|----------|-------|---------------|
+| **Yahoo Finance** (default, `MARKET_DATA_PROVIDER=yahoo`) | None — keyless | 1m/5m/15m/1h/1d history + 1-min LTP polling for NIFTY 50 + NIFTY/BANKNIFTY/INDIAVIX (~15-min delayed) |
+| **Angel One** (`MARKET_DATA_PROVIDER=angel`) | Master: none — public ScripMaster JSON. Quotes: `ANGEL_API_KEY`, `ANGEL_CLIENT_ID`, `ANGEL_PASSWORD`, `ANGEL_TOTP_SECRET` (you have a free API; add keys when ready, code is already wired) | Real exchange tokens, lot/tick sizes, expiries; real-time quotes + websocket once keys exist |
+
+Live paper runs on **1-min polling** (true tick websocket needs broker login).
+Every poll writes the raw tick first (replay fidelity), validates against all
+9 rules in plan §4.4 (rejects → `bad_ticks` with reason codes), folds ticks
+into 1m candles (09:15-IST grid, explicit empty-candle markers, closed-only
+reads), caches latest prices in Redis, and watches a heartbeat for silence.
+
+```bash
+cd backend
+python manage.py sync_master                        # master from Yahoo seed / Angel
+python manage.py backfill_history --symbols RELIANCE,TCS --interval 1d --days 30
+python manage.py poll_prices --once                  # single cycle (Beat uses this)
+python manage.py poll_prices                         # forever loop (supervisor/dev)
+python manage.py data_quality_report                 # after-close verdict (OK/SUSPECT)
 ```
 
 ## Quality Gates
@@ -76,7 +103,7 @@ Every one of these runs in CI and **blocks the merge on failure** — there are 
 | Static security | `bandit -r backend/ -c pyproject.toml` |
 | Dependency CVEs | `pip-audit` on `base.txt`, `prod.txt`, `dev.txt` |
 | Leaked secrets | `detect-secrets-hook` against `.secrets.baseline` |
-| Tests + coverage | `pytest` (coverage floor 80%, currently 98%) |
+| Tests + coverage | `pytest` (coverage floor 80%, currently 90%) |
 | Migration drift | `manage.py makemigrations --check --dry-run` |
 | Deploy readiness | `manage.py check --deploy --fail-level WARNING` |
 | Types | `mypy` with django-stubs |
@@ -120,7 +147,7 @@ This project treats security as a first-class concern:
 | Phase | Status |
 |-------|--------|
 | 0. Foundations | ✅ Done — repo, Docker, CI, settings, Clock, models, instrument loader |
-| 1. Data Layer | ⏳ Planned |
+| 1. Data Layer | 🔨 In Progress — ticks/candles/providers/ingestion/quality built on free tier (Yahoo + Angel), needs live 5-day no-gap proof |
 | 2. Paper Broker Core | ⏳ Planned |
 | 3. Risk Engine | ⏳ Planned |
 | 4. Strategy Framework | ⏳ Planned |

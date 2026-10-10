@@ -126,6 +126,7 @@ jobs:
             --cov=core \
             --cov=security \
             --cov=instruments \
+            --cov=market_data \
             --cov-report=xml \
             --cov-report=term-missing \
             --tb=short

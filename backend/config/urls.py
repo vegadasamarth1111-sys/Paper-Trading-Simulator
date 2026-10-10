@@ -16,6 +16,8 @@ urlpatterns = [
     path("api/v1/auth/", include("security.urls")),
     # Instrument data
     path("api/v1/instruments/", include("instruments.urls")),
+    # Market data (Phase 1: latest prices, candles, data quality)
+    path("api/v1/market/", include("market_data.urls")),
     # Admin — protected by AdminIPWhitelistMiddleware
     path("admin/", admin.site.urls),
 ]

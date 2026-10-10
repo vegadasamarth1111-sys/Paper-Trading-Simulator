@@ -39,7 +39,7 @@ ignore = [
 "backend/tests/**" = ["S105", "S603"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["core", "security", "instruments", "engine"]
+known-first-party = ["core", "security", "instruments", "engine", "market_data"]
 
 [tool.mypy]
 python_version = "3.14"
@@ -54,7 +54,7 @@ strict_settings = false
 # DRF has no py.typed marker; its stubs package (djangorestframework-stubs)
 # requires django-stubs>=6 / Django 6, which we do not use yet.
 [[tool.mypy.overrides]]
-module = ["bleach", "bleach.*", "decouple", "decouple.*", "rest_framework", "rest_framework.*", "rest_framework_simplejwt", "rest_framework_simplejwt.*"]
+module = ["bleach", "bleach.*", "celery", "celery.*", "decouple", "decouple.*", "httpx", "rest_framework", "rest_framework.*", "rest_framework_simplejwt", "rest_framework_simplejwt.*"]
 ignore_missing_imports = true
 # Tests exercise runtime behaviour, not static contracts.
 [[tool.mypy.overrides]]
@@ -66,7 +66,7 @@ exclude_dirs = ["backend/tests", "backend/*/tests", "backend/venv", "venv"]
 skips = ["B101"]
 
 [tool.coverage.run]
-source = ["core", "security", "instruments"]
+source = ["core", "security", "instruments", "market_data"]
 omit = ["*/migrations/*", "*/tests/*", "*/admin.py"]
 
 [tool.coverage.report]
