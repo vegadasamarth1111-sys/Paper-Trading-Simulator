@@ -23,6 +23,14 @@ env:
   # settings refuse to start with a placeholder/short key anyway.
   DJANGO_SECRET_KEY: ci-only-django-secret-key-not-a-real-deployment-key-0000000000  # pragma: allowlist secret
   JWT_SIGNING_KEY: ci-only-jwt-signing-key-not-a-real-deployment-key-000000  # pragma: allowlist secret
+  # No .env exists in CI (it is gitignored), so every setting without a
+  # default must be supplied here. testing.py switches to in-memory SQLite,
+  # so this password is never used to connect anywhere.
+  DB_PASSWORD: ci-only-db-password-unused-in-tests  # pragma: allowlist secret
+  # W020: `check --deploy` rejects an empty ALLOWED_HOSTS, and without a
+  # .env there is nothing to populate it. These are the same values as
+  # .env.example's template.
+  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,ci.invalid
   TRADING_MODE: paper
   LIVE_TRADING_ENABLED: "False"
 
