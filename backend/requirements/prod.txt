@@ -1,0 +1,16 @@
+# =============================================================================
+# Paper Trading Simulator - Production Dependencies
+# =============================================================================
+
+-r base.txt
+
+# Production WSGI/ASGI server
+gunicorn==26.2.0
+
+# Static file serving (with compression + immutable cache headers)
+whitenoise==6.12.0
+
+# NOTE: `django-db-connection-pool` was removed. It was never configured in
+# settings, so it added an unaudited dependency without doing anything.
+# Connection persistence is already handled by DB_CONN_MAX_AGE in base.py.
+# Add a pooling library back only when it is actually configured and tested.

@@ -1,0 +1,13 @@
+# Normalize line endings: LF in the repository, whatever the OS uses locally.
+* text=auto eol=lf
+
+# Binary files must never be transformed.
+*.docx binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.whl binary

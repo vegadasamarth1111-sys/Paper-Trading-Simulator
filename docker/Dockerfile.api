@@ -1,0 +1,50 @@
+# =============================================================================
+# Paper Trading Simulator — API Dockerfile
+# Multi-stage build for smaller, more secure images
+# =============================================================================
+FROM python:3.14-slim AS base
+
+# Security: run as non-root user
+RUN groupadd -r appuser && useradd -r -g appuser -d /app -s /sbin/nologin appuser
+
+# System dependencies for mysqlclient
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    default-libmysqlclient-dev \
+    gcc \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install Python dependencies first (better Docker layer caching)
+COPY backend/requirements/base.txt requirements/base.txt
+COPY backend/requirements/prod.txt requirements/prod.txt
+RUN pip install --no-cache-dir -r requirements/prod.txt
+
+# Copy application code
+COPY backend/ .
+
+# Create necessary directories
+RUN mkdir -p logs static_collected \
+    && chown -R appuser:appuser /app
+
+# Collect static files
+RUN python manage.py collectstatic --noinput 2>/dev/null || true
+
+# Switch to non-root user
+USER appuser
+
+# Expose port
+EXPOSE 8000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/')" || exit 1
+
+# Production: use gunicorn
+CMD ["gunicorn", "config.wsgi:application", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "3", \
+     "--timeout", "120", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]

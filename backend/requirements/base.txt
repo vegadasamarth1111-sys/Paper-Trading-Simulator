@@ -1,0 +1,65 @@
+# =============================================================================
+# Paper Trading Simulator - Base Dependencies (all environments)
+#
+# Every version is pinned to prevent supply-chain surprises.
+# All pins support Python 3.10 - 3.14 and ship prebuilt wheels (no compiler
+# needed on Windows/macOS/Linux).
+#
+# Security: versions below are the minimum that clear `pip-audit` as of the
+# last audit. Run `pip-audit -r backend/requirements/base.txt` after any change.
+# =============================================================================
+
+# Django core
+# 5.2 is the current LTS line (security support to April 2028).
+# 5.1.x is end-of-life and carries ~30 known CVEs - do NOT downgrade.
+Django==5.2.18
+# DRF 3.18.x is the first line that requires Django>=5.2
+djangorestframework==3.18.3
+django-cors-headers==4.9.0
+
+# Database
+mysqlclient==2.3.0
+
+# Redis (cache + event bus)
+django-redis==7.0.0
+redis==8.1.0
+
+# Authentication
+djangorestframework-simplejwt==5.5.1
+PyJWT==2.15.1
+
+# Password hashing (Argon2id - memory-hard, GPU-attack resistant)
+argon2-cffi==25.1.0
+
+# Celery (task queue: EOD reports, data checks)
+celery==5.6.3
+django-celery-beat==2.9.0
+
+# Configuration from environment variables
+python-decouple==3.8
+
+# Input sanitization (output encoding / HTML stripping)
+bleach==6.4.0
+
+# Security headers - Content-Security-Policy middleware
+django-csp==4.0
+
+# HTTP client (for broker APIs in Phase 1)
+httpx==0.28.1
+
+# Async server + market data websockets (Phase 1)
+uvicorn==0.54.0
+websockets==17.2
+
+# Monitoring / error tracking
+sentry-sdk==2.71.0
+
+# Timezone handling is done with the stdlib `zoneinfo` module (see core.clock);
+# `pytz` was removed because using it as a `tzinfo` silently yields LMT instead
+# of IST, which would corrupt market-hour decisions.
+
+# Structured logging
+structlog==26.1.0
+
+# Schema validation for market data
+pydantic==2.14.0

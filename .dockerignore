@@ -1,0 +1,37 @@
+# =============================================================================
+# Paper Trading Simulator — Docker Ignore
+# Prevent sensitive and unnecessary files from entering Docker images
+# =============================================================================
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+__pycache__
+*.pyc
+*.pyo
+venv
+.venv
+backend/venv
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.secrets.baseline
+*.docx
+htmlcov
+.coverage
+node_modules
+frontend/build
+frontend/dist
+*.md
+!README.md
+docker-compose*.yml
+.vscode
+.idea
+*.swp
+*.swo
+Thumbs.db
+.DS_Store

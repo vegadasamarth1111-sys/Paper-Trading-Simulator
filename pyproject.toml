@@ -1,0 +1,74 @@
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings.testing"
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short --strict-markers"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "security: marks security-related tests",
+    "integration: marks integration tests",
+]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+src = ["backend"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "B",    # flake8-bugbear
+    "S",    # flake8-bandit (security)
+    "UP",   # pyupgrade
+    "SIM",  # flake8-simplify
+]
+ignore = [
+    "S101",  # assert in tests is fine
+    "S106",  # hardcoded passwords in tests is fine
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Migrations are machine-generated; their line length is not worth fighting.
+"backend/**/migrations/*.py" = ["E501"]
+# Test fixtures legitimately contain fake credentials and spawn subprocesses
+# with a fixed, trusted argv (never shell=True).
+"backend/tests/**" = ["S105", "S603"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["core", "security", "instruments", "engine"]
+
+[tool.mypy]
+python_version = "3.14"
+plugins = ["mypy_django_plugin.main"]
+exclude = ["^backend/venv/", "/migrations/"]
+
+[tool.django-stubs]
+django_settings_module = "config.settings.testing"
+strict_settings = false
+
+# Third-party packages shipped without type information.
+# DRF has no py.typed marker; its stubs package (djangorestframework-stubs)
+# requires django-stubs>=6 / Django 6, which we do not use yet.
+[[tool.mypy.overrides]]
+module = ["bleach", "bleach.*", "decouple", "decouple.*", "rest_framework", "rest_framework.*", "rest_framework_simplejwt", "rest_framework_simplejwt.*"]
+ignore_missing_imports = true
+# Tests exercise runtime behaviour, not static contracts.
+[[tool.mypy.overrides]]
+module = ["tests.*", "conftest"]
+disallow_untyped_defs = false
+
+[tool.bandit]
+exclude_dirs = ["backend/tests", "backend/*/tests", "backend/venv", "venv"]
+skips = ["B101"]
+
+[tool.coverage.run]
+source = ["core", "security", "instruments"]
+omit = ["*/migrations/*", "*/tests/*", "*/admin.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true

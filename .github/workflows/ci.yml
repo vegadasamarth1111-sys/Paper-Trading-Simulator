@@ -1,0 +1,185 @@
+# =============================================================================
+# Paper Trading Simulator — CI Pipeline
+# Runs on every push and PR. Every step below BLOCKS the merge on failure;
+# there are deliberately no `|| true` escapes.
+# =============================================================================
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Least privilege: the workflow gets read access to nothing else.
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.14"
+  DJANGO_SETTINGS_MODULE: config.settings.testing
+  # CI-only throwaway values. Real secrets come from GitHub Actions secrets.
+  # These are intentionally short and obviously non-production; production
+  # settings refuse to start with a placeholder/short key anyway.
+  DJANGO_SECRET_KEY: ci-only-django-secret-key-not-a-real-deployment-key-0000000000  # pragma: allowlist secret
+  JWT_SIGNING_KEY: ci-only-jwt-signing-key-not-a-real-deployment-key-000000  # pragma: allowlist secret
+  TRADING_MODE: paper
+  LIVE_TRADING_ENABLED: "False"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Code Quality — lint, format, static security analysis
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint & Static Security
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements/dev.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements/dev.txt
+
+      - name: Ruff lint
+        run: ruff check backend/
+
+      - name: Ruff format check
+        run: ruff format --check backend/
+
+      - name: Bandit security scan
+        # -x keeps the virtualenv out of the scan; pyproject.toml supplies
+        # the skips (B101 asserts) and per-file exclusions.
+        run: bandit -r backend/ -c pyproject.toml -x backend/venv,backend/tests
+
+  # ---------------------------------------------------------------------------
+  # Security — dependency CVEs + leaked-secret detection
+  # ---------------------------------------------------------------------------
+  security:
+    name: Dependency & Secret Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements/dev.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements/dev.txt
+
+      - name: Audit runtime dependencies (base.txt)
+        run: pip-audit -r backend/requirements/base.txt --strict
+
+      - name: Audit production dependencies (prod.txt)
+        run: pip-audit -r backend/requirements/prod.txt --strict
+
+      - name: Audit dev/CI dependencies (dev.txt)
+        run: pip-audit -r backend/requirements/dev.txt --strict
+
+      - name: Scan for leaked secrets (against committed baseline)
+        # Fails on ANY finding that is not already recorded in the baseline.
+        # To accept a vetted false positive, regenerate the baseline locally
+        # with: detect-secrets scan <files> > .secrets.baseline
+        run: |
+          git ls-files -z | xargs -0 detect-secrets-hook --baseline .secrets.baseline
+
+  # ---------------------------------------------------------------------------
+  # Tests — pytest with coverage gate
+  # ---------------------------------------------------------------------------
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements/dev.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements/dev.txt
+
+      - name: Run tests with coverage
+        working-directory: backend
+        run: |
+          pytest \
+            --cov=core \
+            --cov=security \
+            --cov=instruments \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --tb=short
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: backend/coverage.xml
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Django System Checks — deploy-readiness + migration drift
+  # ---------------------------------------------------------------------------
+  django-checks:
+    name: Django Checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements/dev.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements/dev.txt
+
+      - name: No missing migrations
+        working-directory: backend
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Deploy checks (production settings)
+        working-directory: backend
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.production
+          DB_HOST: 127.0.0.1
+          DB_PORT: "3306"
+        run: python manage.py check --deploy --fail-level WARNING
+
+  # ---------------------------------------------------------------------------
+  # Type checking
+  # ---------------------------------------------------------------------------
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements/dev.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements/dev.txt
+
+      - name: mypy
+        working-directory: backend
+        run: mypy .

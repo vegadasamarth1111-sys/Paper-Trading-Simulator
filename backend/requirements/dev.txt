@@ -1,0 +1,39 @@
+# =============================================================================
+# Paper Trading Simulator - Development / CI Dependencies
+# =============================================================================
+
+-r base.txt
+
+# Testing
+pytest==9.1.1
+pytest-django==4.14.0
+pytest-asyncio==1.4.0
+pytest-cov==7.1.0
+hypothesis==6.168.5
+factory-boy==3.3.3
+faker==40.43.0
+
+# Security scanning (these run in CI on every commit)
+pip-audit==2.10.1
+detect-secrets==1.5.0
+bandit==1.9.4
+
+# Code quality
+ruff==0.17.0
+# mypy is pinned to 1.x because django-stubs 5.2 declares mypy<1.20 compatible.
+# django-stubs is pinned to the 5.2 line to match our Django 5.2 LTS.
+# `djangorestframework-stubs` is intentionally NOT installed: every release
+# from 3.17.0 onward requires django-stubs>=6.0, i.e. the Django 6 line, which
+# would conflict with Django 5.2. Add it back once the project moves to Django 6.
+mypy==1.19.1
+django-stubs[compatible-mypy]==5.2.9
+
+# Pre-commit hooks
+pre-commit==4.6.2
+
+# Debug toolbar (dev only, never in production)
+django-debug-toolbar==8.0.0
+
+# Shell enhancement
+ipython==9.17.1
+django-extensions==4.1
