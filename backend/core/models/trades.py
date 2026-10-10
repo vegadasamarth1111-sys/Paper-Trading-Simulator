@@ -33,6 +33,12 @@ class Trade(models.Model):
         "core.Order",
         on_delete=models.PROTECT,
         related_name="trades",
+        null=True,
+        blank=True,
+        help_text=(
+            "Originating order (null for order-less settlement fills such as "
+            "ITM option expiry cash settlement, and for adjusting entries)"
+        ),
     )
     account = models.ForeignKey(
         "core.Account",

@@ -59,13 +59,30 @@ docker-compose up --build
 │   ├── market_data/         # Phase 1: ticks, candles, providers, ingestion, quality
 │   │   ├── providers/       # yahoo (keyless) + angel (keyless master, keyed quotes)
 │   │   └── management/commands/  # poll_prices, backfill_history, sync_master, data_quality_report
-│   ├── tests/               # 393 pytest tests (73 for market data)
+│   ├── broker/              # Phase 2: costs, fills, margin, ledger, EOD
+│   │   └── management/commands/  # load_cost_table, verify_costs, reconcile, settle_day
+│   ├── tests/               # 506 pytest tests (104 broker + 73 market data)
 │   └── requirements/        # base.txt / prod.txt / dev.txt (pinned)
 ├── docker/                  # Dockerfiles
 ├── .github/workflows/ci.yml # CI: lint, bandit, pip-audit, secrets, tests, deploy checks
 ├── pyproject.toml           # ruff / mypy / bandit / pytest / coverage config
-└── engine/  frontend/       # Phase 2+ (not yet created)
+└── engine/  frontend/       # Phase 3+ (not yet created)
 ```
+
+## Paper Broker (Phase 2 — ₹10L paper, Zerodha-style costs, no naked shorts)
+
+```bash
+cd backend
+python manage.py load_cost_table   # seed the versioned charge schedule
+python manage.py verify_costs      # 20-trade table: tick off vs broker's calculator
+python manage.py reconcile         # rebuild balances/positions from fills, report drift
+python manage.py settle_day        # expire DAY orders, square off MIS, settle, snapshot
+```
+
+Fill realism (plan §5.3): market fills at bid/ask (never LTP), conservative
+limits need trade-through, stops trigger on LTP cross, one tick absorbs at
+most 50% of displayed depth, circuits halt, illiquid names reject, 2bps +
+300ms-latency defaults — all in `broker/fills.py`, all unit-tested.
 
 ## Market Data (Phase 1 — free tier, zero keys)
 
@@ -147,7 +164,8 @@ This project treats security as a first-class concern:
 | Phase | Status |
 |-------|--------|
 | 0. Foundations | ✅ Done — repo, Docker, CI, settings, Clock, models, instrument loader |
-| 1. Data Layer | 🔨 In Progress — ticks/candles/providers/ingestion/quality built on free tier (Yahoo + Angel), needs live 5-day no-gap proof |
+| 1. Data Layer | ✅ Done — ticks/candles/providers/ingestion/quality on free tier (live 5-day proof pending) |
+| 2. Paper Broker Core | 🔨 In Progress — fills, costs, margin, ledger, EOD built; broker-calculator cross-check is yours |
 | 2. Paper Broker Core | ⏳ Planned |
 | 3. Risk Engine | ⏳ Planned |
 | 4. Strategy Framework | ⏳ Planned |

@@ -39,7 +39,7 @@ ignore = [
 "backend/tests/**" = ["S105", "S603"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["core", "security", "instruments", "engine", "market_data"]
+known-first-party = ["core", "security", "instruments", "engine", "market_data", "broker"]
 
 [tool.mypy]
 python_version = "3.14"
@@ -66,7 +66,7 @@ exclude_dirs = ["backend/tests", "backend/*/tests", "backend/venv", "venv"]
 skips = ["B101"]
 
 [tool.coverage.run]
-source = ["core", "security", "instruments", "market_data"]
+source = ["core", "security", "instruments", "market_data", "broker"]
 omit = ["*/migrations/*", "*/tests/*", "*/admin.py"]
 
 [tool.coverage.report]

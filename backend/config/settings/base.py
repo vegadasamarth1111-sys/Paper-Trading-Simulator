@@ -75,6 +75,7 @@ LOCAL_APPS = [
     "security",
     "instruments",
     "market_data",
+    "broker",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -359,6 +360,17 @@ ANGEL_API_KEY = config("ANGEL_API_KEY", default="")
 ANGEL_CLIENT_ID = config("ANGEL_CLIENT_ID", default="")
 ANGEL_PASSWORD = config("ANGEL_PASSWORD", default="")
 ANGEL_TOTP_SECRET = config("ANGEL_TOTP_SECRET", default="")
+
+# =============================================================================
+# PAPER BROKER — Phase 2 fill realism (all safe defaults; env overrides)
+# =============================================================================
+PAPER_SLIPPAGE_BPS = config("PAPER_SLIPPAGE_BPS", default="2")
+PAPER_SLIPPAGE_TICKS = config("PAPER_SLIPPAGE_TICKS", default=0, cast=int)
+PAPER_LATENCY_MS = config("PAPER_LATENCY_MS", default=300, cast=int)
+PAPER_FILL_MAX_DEPTH_RATIO = config("PAPER_FILL_MAX_DEPTH_RATIO", default="0.5")
+PAPER_CONSERVATIVE_LIMIT = config("PAPER_CONSERVATIVE_LIMIT", default=True, cast=bool)
+PAPER_MIN_DEPTH_QTY = config("PAPER_MIN_DEPTH_QTY", default=0, cast=int)
+PAPER_MIN_VOLUME = config("PAPER_MIN_VOLUME", default=0, cast=int)
 
 # =============================================================================
 # SENTRY (Error Tracking)
