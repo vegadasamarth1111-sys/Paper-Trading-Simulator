@@ -10,6 +10,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
+import structlog
 from decouple import Csv, config
 
 # =============================================================================
@@ -76,6 +77,7 @@ LOCAL_APPS = [
     "instruments",
     "market_data",
     "broker",
+    "risk",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -393,6 +395,11 @@ if SENTRY_DSN:
 # =============================================================================
 # LOGGING (Structured JSON)
 # =============================================================================
+# NOTE: ProcessorFormatter "processor" values must be INSTANCES, not dotted
+# strings. dictConfig only resolves "()" keys; a dotted string here is
+# stored verbatim and called at emit time, which turns EVERY error-level
+# log into a "Logging error" on stderr and silently drops the record.
+# (Found because the kill-switch error log hit exactly that path.)
 # Typed loosely: Django's LOGGING schema is nested and heterogeneous, and
 # the settings modules below mutate it. `dict[str, Any]` keeps those mutations
 # statically checkable instead of inferring an unusable `dict[str, object]`.
@@ -402,11 +409,11 @@ LOGGING: dict[str, Any] = {
     "formatters": {
         "structured": {
             "()": "structlog.stdlib.ProcessorFormatter",
-            "processor": "structlog.dev.ConsoleRenderer",
+            "processor": structlog.dev.ConsoleRenderer(),
         },
         "json": {
             "()": "structlog.stdlib.ProcessorFormatter",
-            "processor": "structlog.processors.JSONRenderer",
+            "processor": structlog.processors.JSONRenderer(),
         },
     },
     "handlers": {

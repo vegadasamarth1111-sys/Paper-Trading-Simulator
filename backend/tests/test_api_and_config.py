@@ -246,3 +246,27 @@ class TestEnvironmentGuard:
         )
         assert result.returncode != 0
         assert "too short" in result.stderr
+
+
+class TestLoggingConfig:
+    """
+    Regression: ProcessorFormatter "processor" values were dotted-path
+    STRINGS, so every error-level log crashed formatting and the record
+    was silently dropped (kill-switch audit logging hit this in tests).
+    dictConfig only resolves "()" keys — processors must be instances.
+    """
+
+    def test_processors_are_callable(self):
+        from django.conf import settings
+
+        for name, formatter in settings.LOGGING["formatters"].items():
+            processor = formatter.get("processor")
+            assert callable(processor), f"formatter {name}: processor is not callable"
+
+    def test_error_log_emits_without_logging_error(self, caplog):
+        import logging
+
+        logger = logging.getLogger("core")
+        with caplog.at_level(logging.ERROR, logger="core"):
+            logger.error("risk-test probe %s", "ok")
+        assert "Logging error" not in caplog.text

@@ -61,12 +61,14 @@ docker-compose up --build
 │   │   └── management/commands/  # poll_prices, backfill_history, sync_master, data_quality_report
 │   ├── broker/              # Phase 2: costs, fills, margin, ledger, EOD
 │   │   └── management/commands/  # load_cost_table, verify_costs, reconcile, settle_day
-│   ├── tests/               # 506 pytest tests (104 broker + 73 market data)
+│   ├── risk/                # Phase 3: 12-rule engine, kill switch, limit seeding
+│   │   └── management/commands/  # seed_risk_defaults, kill_switch
+│   ├── tests/               # 536 pytest tests (28 risk + 113 broker + 73 market data)
 │   └── requirements/        # base.txt / prod.txt / dev.txt (pinned)
 ├── docker/                  # Dockerfiles
 ├── .github/workflows/ci.yml # CI: lint, bandit, pip-audit, secrets, tests, deploy checks
 ├── pyproject.toml           # ruff / mypy / bandit / pytest / coverage config
-└── engine/  frontend/       # Phase 3+ (not yet created)
+└── engine/  frontend/       # Phase 4+ (not yet created)
 ```
 
 ## Paper Broker (Phase 2 — ₹10L paper, Zerodha-style costs, no naked shorts)
@@ -83,6 +85,23 @@ Fill realism (plan §5.3): market fills at bid/ask (never LTP), conservative
 limits need trade-through, stops trigger on LTP cross, one tick absorbs at
 most 50% of displayed depth, circuits halt, illiquid names reject, 2bps +
 300ms-latency defaults — all in `broker/fills.py`, all unit-tested.
+
+## Risk Engine (Phase 3 — 12 rules + kill switch)
+
+```bash
+cd backend
+python manage.py seed_risk_defaults --account <UUID>   # documented limits, never overwrites tuned rows
+python manage.py kill_switch --account <UUID> --reason "manual halt"
+python manage.py kill_switch --account <UUID> --release --reason "false alarm"
+```
+
+All plan §6 rules enforced between strategy and broker (first breach wins,
+every rejection logged with its rule): position size (₹2L + 20%), 10 open
+positions, 1% risk/trade from stop distance, 2% daily loss, 10% drawdown
+halt, 50 trades/day, mandatory stops, duplicate-signal guard, 10/min order
+rate, trading window (no entries before 09:20 or after 15:15 IST), kill
+switch, stale-tick guard. Exits are never trapped — only the kill switch
+blocks exits, and kill/EOD square-offs bypass with full audit.
 
 ## Market Data (Phase 1 — free tier, zero keys)
 
@@ -165,7 +184,8 @@ This project treats security as a first-class concern:
 |-------|--------|
 | 0. Foundations | ✅ Done — repo, Docker, CI, settings, Clock, models, instrument loader |
 | 1. Data Layer | ✅ Done — ticks/candles/providers/ingestion/quality on free tier (live 5-day proof pending) |
-| 2. Paper Broker Core | 🔨 In Progress — fills, costs, margin, ledger, EOD built; broker-calculator cross-check is yours |
+| 2. Paper Broker Core | ✅ Done — fills, costs, margin, ledger, EOD (broker-calculator check is yours) |
+| 3. Risk Engine | 🔨 In Progress — 12 rules + kill switch built, needs your review |
 | 2. Paper Broker Core | ⏳ Planned |
 | 3. Risk Engine | ⏳ Planned |
 | 4. Strategy Framework | ⏳ Planned |

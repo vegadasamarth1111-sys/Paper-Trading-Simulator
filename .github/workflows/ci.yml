@@ -128,6 +128,7 @@ jobs:
             --cov=instruments \
             --cov=market_data \
             --cov=broker \
+            --cov=risk \
             --cov-report=xml \
             --cov-report=term-missing \
             --tb=short

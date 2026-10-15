@@ -116,3 +116,21 @@ def order(account, equity_instrument):
         product_type="MIS",
         quantity=10,
     )
+
+
+@pytest.fixture
+def frozen_clock():
+    """
+    A REPLAY clock frozen inside market hours (Monday 10:00 IST).
+
+    The broker judges the trading window against its clock, so placements
+    need a frozen clock to be time-deterministic. Production uses wall time.
+    """
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from core.clock import Clock, ClockMode
+
+    clock = Clock(mode=ClockMode.REPLAY)
+    clock.set_time(datetime(2026, 1, 5, 4, 30, tzinfo=ZoneInfo("UTC")))
+    return clock

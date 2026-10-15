@@ -46,8 +46,9 @@ def _snap(price="2500", qty=1000):
 
 
 @pytest.fixture
-def broker():
-    return PaperBroker()
+def broker(frozen_clock):
+    """PaperBroker on a frozen in-hours clock (deterministic risk window)."""
+    return PaperBroker(clock=frozen_clock)
 
 
 class TestPlacement:
@@ -62,6 +63,7 @@ class TestPlacement:
             product_type="MIS",
             validity="DAY",
             client_order_id="mkt-1",
+            stop_loss_price=Decimal("2400"),
         )
         assert order.status == OrderStatus.FILLED
         assert order.filled_quantity == 10
@@ -81,6 +83,7 @@ class TestPlacement:
             product_type="MIS",
             validity="DAY",
             client_order_id="idem-1",
+            stop_loss_price=Decimal("2400"),
         )
         second = broker.place_order(
             account=account,
@@ -107,6 +110,7 @@ class TestPlacement:
             product_type="MIS",
             validity="DAY",
             client_order_id="lmt-1",
+            stop_loss_price=Decimal("2350"),
         )
         assert order.status == OrderStatus.OPEN
         assert Trade.objects.count() == 0
@@ -115,7 +119,18 @@ class TestPlacement:
         assert order.status == OrderStatus.FILLED  # ask 2399 < limit 2400: trade-through
 
     def test_insufficient_margin_rejects(self, broker, account, equity_instrument):
+        from core.enums import RiskRuleType
+        from core.models import RiskConfig
+
         _seed_tick(equity_instrument, price="2500")
+        # Lift the position-size cap so the order reaches the margin check.
+        RiskConfig.objects.create(
+            account=account,
+            strategy=None,
+            rule_type=RiskRuleType.MAX_POSITION_SIZE,
+            limit_value=Decimal("1000000000"),
+            limit_percentage=None,
+        )
         order = broker.place_order(
             account=account,
             instrument=equity_instrument,
@@ -125,6 +140,7 @@ class TestPlacement:
             product_type="CNC",
             validity="DAY",
             client_order_id="big-1",
+            stop_loss_price=Decimal("2499.99"),
         )
         assert order.status == OrderStatus.REJECTED
         assert "margin" in order.rejection_reason
@@ -221,6 +237,7 @@ class TestModifyCancel:
             product_type="MIS",
             validity="DAY",
             client_order_id="mod-1",
+            stop_loss_price=Decimal("2350"),
         )
         broker.modify_order(order, price=Decimal("2390"))
         order.refresh_from_db()
@@ -237,6 +254,7 @@ class TestModifyCancel:
             product_type="MIS",
             validity="DAY",
             client_order_id="mod-2",
+            stop_loss_price=Decimal("2400"),
         )
         with pytest.raises(InvalidOrderTransitionError):
             broker.modify_order(order, price=Decimal("1"))
@@ -253,6 +271,7 @@ class TestModifyCancel:
             product_type="MIS",
             validity="DAY",
             client_order_id="cxl-1",
+            stop_loss_price=Decimal("2350"),
         )
         account.refresh_from_db()
         assert account.margin_used > 0
@@ -301,6 +320,7 @@ class TestBracketOCO:
             product_type="MIS",
             validity="IOC",
             client_order_id="ioc-1",
+            stop_loss_price=Decimal("2350"),
         )
         broker.process_snapshot(equity_instrument, _snap(price="2500"))
         order.refresh_from_db()
@@ -319,6 +339,7 @@ class TestMoneyFlow:
             product_type="MIS",
             validity="DAY",
             client_order_id="rt-buy",
+            stop_loss_price=Decimal("2400"),
         )
         assert buy.status == OrderStatus.FILLED
         # The market moves via a new tick (snapshots passed to the matcher are

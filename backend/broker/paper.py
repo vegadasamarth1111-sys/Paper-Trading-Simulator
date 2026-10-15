@@ -33,6 +33,7 @@ from zoneinfo import ZoneInfo
 from django.db import transaction
 from django.utils import timezone
 
+from core.clock import Clock, ClockMode
 from core.enums import OrderSide, OrderStatus, OrderType, OrderValidity, ProductType
 from core.exceptions import InvalidOrderTransitionError
 from core.models.accounts import Account
@@ -104,6 +105,12 @@ def _snapshot_for(instrument: Instrument) -> MarketSnapshot | None:
 class PaperBroker(BrokerInterface):
     """Simulated broker. All state changes are transactional + audited."""
 
+    def __init__(self, clock: Clock | None = None) -> None:
+        # Single source of time (plan section 2): the risk engine judges
+        # the trading window against this clock. Tests inject a REPLAY
+        # clock frozen inside market hours; production uses wall time.
+        self._clock = clock or Clock(mode=ClockMode.LIVE)
+
     # ------------------------------------------------------------------
     # Placement
     # ------------------------------------------------------------------
@@ -124,6 +131,9 @@ class PaperBroker(BrokerInterface):
         target_price: Decimal | None = None,
         stoploss_price: Decimal | None = None,
         strategy_run: StrategyRun | None = None,
+        signal_id: str | None = None,
+        stop_loss_price: Decimal | None = None,
+        skip_risk: bool = False,
     ) -> Order:
         from core.models.orders import Order, OrderEvent
 
@@ -212,10 +222,40 @@ class PaperBroker(BrokerInterface):
             if lower is not None and price < lower:
                 return _reject(f"limit {price} below lower circuit {lower}")
 
-        # --- Margin check (value + estimated costs must fit) ---
+        # --- Reference price (margin + risk need a price to judge value) ---
         ref_price = price or self._reference_price(instrument)
         if ref_price is None:
             return _reject("no market price available (stale data guard)")
+
+        # --- Risk engine (sits between strategy and broker; plan section 6).
+        # Skipped ONLY for the engine's own exits (kill switch, EOD), which
+        # must be able to close into a halted account. Every bypassed order
+        # is still fully audited via OrderEvents.
+        if not skip_risk:
+            from risk.engine import CheckRequest, RiskEngine
+
+            decision = RiskEngine.check(
+                CheckRequest(
+                    account=account,
+                    instrument=instrument,
+                    side=side,
+                    order_type=order_type,
+                    quantity=quantity,
+                    product_type=product_type,
+                    ref_price=ref_price,
+                    trigger_price=trigger_price,
+                    stop_loss_price=stop_loss_price or stoploss_price,
+                    signal_id=signal_id,
+                    strategy_run=strategy_run,
+                    client_order_id=client_order_id,
+                    exclude_order_id=order.id,
+                    now=self._clock.now(),
+                )
+            )
+            if not decision.approved:
+                return _reject(f"risk {decision.rule}: {decision.message}")
+
+        # --- Margin check (value + estimated costs must fit) ---
         try:
             need = required_margin(
                 quantity=quantity,
@@ -249,7 +289,11 @@ class PaperBroker(BrokerInterface):
             from_status=OrderStatus.NEW,
             to_status=OrderStatus.VALIDATED,
             reason="checks passed",
-            metadata={"margin_blocked": str(need.margin), "margin_basis": need.basis},
+            metadata={
+                "margin_blocked": str(need.margin),
+                "margin_basis": need.basis,
+                "signal_id": signal_id,
+            },
         )
         order.transition_to(OrderStatus.OPEN, reason="sent to matching engine")
         order.opened_at = timezone.now()

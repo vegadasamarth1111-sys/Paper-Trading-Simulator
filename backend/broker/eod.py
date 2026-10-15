@@ -105,6 +105,8 @@ def square_off_intraday(*, account: Account, price_of, broker: PaperBroker) -> d
             client_order_id=(
                 f"sqoff-{account.id}-{position.instrument.symbol}-{as_of_stamp()}"  # type: ignore[attr-defined]
             ),
+            # EOD exits must close into any halt state (same bypass as kill).
+            skip_risk=True,
         )
         if order.status == OrderStatus.REJECTED:  # type: ignore[attr-defined]
             summary["skipped"].append(

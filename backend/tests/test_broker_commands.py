@@ -16,12 +16,19 @@ import pytest
 from django.core.management import call_command
 
 from broker.models import CostTable
+from broker.paper import PaperBroker
 from core.models import Position
 
 UTC = ZoneInfo("UTC")
 PX = datetime(2026, 1, 5, 4, 30, tzinfo=UTC)
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def broker(frozen_clock):
+    """PaperBroker on a frozen in-hours clock (deterministic risk window)."""
+    return PaperBroker(clock=frozen_clock)
 
 
 def _tick(instrument, price="2500", vol=1000):
@@ -57,11 +64,9 @@ class TestVerifyCosts:
 
 
 class TestReconcileCommand:
-    def test_clean_books_succeed(self, account, equity_instrument):
+    def test_clean_books_succeed(self, broker, account, equity_instrument):
         _tick(equity_instrument)
-        from broker.paper import PaperBroker
-
-        PaperBroker().place_order(
+        broker.place_order(
             account=account,
             instrument=equity_instrument,
             side="BUY",
@@ -70,6 +75,7 @@ class TestReconcileCommand:
             product_type="MIS",
             validity="DAY",
             client_order_id="cmd-1",
+            stop_loss_price=Decimal("2400"),
         )
         call_command("reconcile", stdout=StringIO())
 
@@ -88,11 +94,9 @@ class TestReconcileCommand:
 
 
 class TestSettleDayCommand:
-    def test_full_pipeline(self, account, equity_instrument):
+    def test_full_pipeline(self, broker, account, equity_instrument):
         _tick(equity_instrument, price="2500")
-        from broker.paper import PaperBroker
-
-        PaperBroker().place_order(
+        broker.place_order(
             account=account,
             instrument=equity_instrument,
             side="BUY",
@@ -101,6 +105,7 @@ class TestSettleDayCommand:
             product_type="MIS",
             validity="DAY",
             client_order_id="sdc-1",
+            stop_loss_price=Decimal("2400"),
         )
         out = StringIO()
         call_command("settle_day", "--date", "2026-01-05", stdout=out)
@@ -121,13 +126,11 @@ class TestTasks:
 
         assert reconcile_task(str(account.id))["ok"] is True
 
-    def test_settle_day_task(self, account, equity_instrument):
+    def test_settle_day_task(self, broker, account, equity_instrument):
         from broker.tasks import settle_day_task
 
         _tick(equity_instrument, price="2500")
-        from broker.paper import PaperBroker
-
-        PaperBroker().place_order(
+        broker.place_order(
             account=account,
             instrument=equity_instrument,
             side="BUY",
@@ -136,6 +139,7 @@ class TestTasks:
             product_type="MIS",
             validity="DAY",
             client_order_id="sdt-1",
+            stop_loss_price=Decimal("2400"),
         )
         result = settle_day_task(str(account.id), "2026-01-05")
         assert result["squared_off"] == 1

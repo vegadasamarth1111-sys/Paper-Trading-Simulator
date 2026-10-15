@@ -36,6 +36,9 @@ class BrokerInterface(ABC):
         target_price: Decimal | None = None,
         stoploss_price: Decimal | None = None,
         strategy_run: StrategyRun | None = None,
+        signal_id: str | None = None,
+        stop_loss_price: Decimal | None = None,
+        skip_risk: bool = False,
     ) -> Order:
         """Validate, margin-check, and open an order. Returns the Order."""
         ...

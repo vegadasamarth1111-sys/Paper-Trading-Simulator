@@ -59,10 +59,15 @@ def _trade(account, instrument, order=None, side="BUY", qty=10, price="100"):
     )
 
 
+@pytest.fixture
+def broker(frozen_clock):
+    """PaperBroker on a frozen in-hours clock (deterministic risk window)."""
+    return PaperBroker(clock=frozen_clock)
+
+
 class TestReconcile:
-    def test_clean_books_reconcile(self, account, equity_instrument):
+    def test_clean_books_reconcile(self, broker, account, equity_instrument):
         _tick(equity_instrument)
-        broker = PaperBroker()
         broker.place_order(
             account=account,
             instrument=equity_instrument,
@@ -72,13 +77,14 @@ class TestReconcile:
             product_type="MIS",
             validity="DAY",
             client_order_id="rc-1",
+            stop_loss_price=Decimal("2400"),
         )
         report = reconcile_account(account)
         assert report.ok, [(m.area, m.key, m.stored, m.rebuilt) for m in report.mismatches]
 
-    def test_balance_drift_detected(self, account, equity_instrument):
+    def test_balance_drift_detected(self, broker, account, equity_instrument):
         _tick(equity_instrument)
-        PaperBroker().place_order(
+        broker.place_order(
             account=account,
             instrument=equity_instrument,
             side="BUY",
@@ -87,6 +93,7 @@ class TestReconcile:
             product_type="MIS",
             validity="DAY",
             client_order_id="rc-2",
+            stop_loss_price=Decimal("2400"),
         )
         account.current_balance += Decimal("100")  # silent hand-edit (the bug)
         account.save()
@@ -176,9 +183,8 @@ class TestLedgerProperty:
 
 
 class TestEOD:
-    def test_day_orders_expire(self, account, equity_instrument):
+    def test_day_orders_expire(self, broker, account, equity_instrument):
         _tick(equity_instrument)
-        broker = PaperBroker()
         order = broker.place_order(
             account=account,
             instrument=equity_instrument,
@@ -189,6 +195,7 @@ class TestEOD:
             product_type="MIS",
             validity="DAY",
             client_order_id="eod-1",
+            stop_loss_price=Decimal("2350"),
         )
         assert order.status == OrderStatus.OPEN
         # placed_at is auto_now_add (today); backdate into the trading day
@@ -198,9 +205,8 @@ class TestEOD:
         order.refresh_from_db()
         assert order.status == OrderStatus.EXPIRED
 
-    def test_mis_squared_off_delivery_left(self, account, equity_instrument):
+    def test_mis_squared_off_delivery_left(self, broker, account, equity_instrument):
         _tick(equity_instrument, price="2500")
-        broker = PaperBroker()
         broker.place_order(
             account=account,
             instrument=equity_instrument,
@@ -210,6 +216,7 @@ class TestEOD:
             product_type="MIS",
             validity="DAY",
             client_order_id="sq-1",
+            stop_loss_price=Decimal("2400"),
         )
         summary = square_off_intraday(
             account=account,
@@ -222,9 +229,9 @@ class TestEOD:
         )
         assert position.quantity == 0
 
-    def test_settle_day_snapshot(self, account, equity_instrument):
+    def test_settle_day_snapshot(self, broker, account, equity_instrument):
         _tick(equity_instrument, price="2500")
-        PaperBroker().place_order(
+        broker.place_order(
             account=account,
             instrument=equity_instrument,
             side="BUY",
@@ -233,6 +240,7 @@ class TestEOD:
             product_type="MIS",
             validity="DAY",
             client_order_id="st-1",
+            stop_loss_price=Decimal("2400"),
         )
         snapshot = settle_day(
             account=account,
