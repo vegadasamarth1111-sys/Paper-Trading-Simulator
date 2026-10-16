@@ -53,15 +53,15 @@ docker-compose up --build
 ```
 ├── backend/                 # Django API + domain models
 │   ├── config/              # Settings (base / development / production / testing)
-│   ├── core/                # Domain models, clock, enums, backups, types
+│   ├── core/                # Domain models, clock, enums, backups, trial records, types
 │   │   └── management/commands/  # backup_db, restore_db
 │   ├── security/            # Auth, permissions, middleware, throttles
 │   ├── instruments/         # Instrument master loader + services
 │   ├── market_data/         # Phase 1: ticks, candles, providers, ingestion, quality
 │   │   ├── providers/       # yahoo (keyless) + angel (keyless master, keyed quotes)
 │   │   └── management/commands/  # poll_prices, backfill_history, sync_master, data_quality_report
-│   ├── broker/              # Phase 2: costs, fills, margin, ledger, EOD
-│   │   └── management/commands/  # load_cost_table, verify_costs, reconcile, settle_day
+│   ├── broker/              # Phases 2+8: costs, fills, margin, ledger, EOD, trial harness
+│   │   └── management/commands/  # + trial_daily, trial_report, trial_note
 │   ├── risk/                # Phase 3: 12-rule engine, kill switch, limit seeding
 │   │   └── management/commands/  # seed_risk_defaults, kill_switch
 │   ├── engine/              # Phase 4: strategies, sizing, backtest/replay runner
@@ -71,7 +71,7 @@ docker-compose up --build
 │   │   └── management/commands/  # load_scores
 │   ├── api/                 # Phase 5: DRF trading API (orders, pnl, risk, kill, CSV, SSE)
 │   ├── alerts/              # Phase 5: Telegram sender (free Bot API, never raises)
-│   ├── tests/               # 660 pytest tests (29 hardening + 24 ML + ...)
+│   ├── tests/               # 677 pytest tests (17 trial + 29 hardening + ...)
 │   └── requirements/        # base.txt / prod.txt / dev.txt (pinned)
 ├── docker/                  # Dockerfiles
 ├── .github/workflows/ci.yml # CI: lint, bandit, pip-audit, secrets, tests, deploy checks
@@ -147,6 +147,25 @@ Look-ahead is structural, not promised: rows carry publication date AND
 newest feature timestamp, and the provider only serves rows with both
 strictly before the trade date. Every signal persists its publication's
 `model_version`, and the run record stamps it too (the exit gate).
+
+## Live Paper Trial (Phase 8 — the harness; time does the rest)
+
+The trial itself takes 6–8 weeks of live data and cannot be shortcut.
+What ships today is the machinery that makes those weeks count:
+
+```bash
+cd backend
+python manage.py trial_daily --date 2026-10-16 [--replay-strategy sma_cross --replay-symbols RELIANCE]
+python manage.py trial_note --date 2026-10-16 --restart   # log verified recoveries
+python manage.py trial_report                             # acceptance verdict
+```
+
+`trial_report` reads the plan's acceptance list off trial evidence and
+prints PASS/FAIL/PENDING per criterion plus the overall verdict. Overall
+PASS is structurally unreachable before 30 trading days — the gate is
+time, and the code refuses to pretend otherwise. Replay accounts
+(`trial-replay-*`, unusable passwords) are excluded from all paper
+aggregates by construction.
 
 ## Hardening (Phase 7 — chaos, load, backups, runbook)
 
@@ -274,7 +293,8 @@ This project treats security as a first-class concern:
 | 4. Strategy Framework + Replay | ✅ Done — baselines, sizing, deterministic runner |
 | 5. API + Dashboard | ✅ Done — endpoints, React app, Telegram; E2E proven on live data |
 | 6. ML Integration | ✅ Done — score store, provider, ranking strategy; look-ahead structural |
-| 7. Hardening | 🔨 In Progress — chaos/load tests, backups, runbook built; needs your review |
+| 7. Hardening | ✅ Done — chaos/load tests, encrypted backups, runbook, security review |
+| 8. Live Paper Trial | 🔨 In Progress — harness built (trial_daily/report/note); gate opens after 30 trading days |
 | 2. Paper Broker Core | ⏳ Planned |
 | 3. Risk Engine | ⏳ Planned |
 | 4. Strategy Framework | ⏳ Planned |

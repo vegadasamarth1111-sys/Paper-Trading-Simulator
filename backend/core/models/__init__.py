@@ -15,6 +15,7 @@ from core.models.positions import PortfolioSnapshot, Position
 from core.models.risk import RiskConfig, RiskEvent
 from core.models.strategies import Signal, Strategy, StrategyRun
 from core.models.trades import Trade
+from core.models.trial import TrialDay
 
 __all__ = [
     "Account",
@@ -32,6 +33,7 @@ __all__ = [
     "Strategy",
     "StrategyRun",
     "Signal",
+    "TrialDay",
     "AuditLog",
     "SystemConfig",
 ]
