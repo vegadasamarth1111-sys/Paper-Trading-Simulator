@@ -65,6 +65,12 @@ export async function api(path, { method = 'GET', body, auth = true } = {}) {
   return data;
 }
 
+// Instrument search (envelope: {success, data:[...]}).
+export async function searchInstruments(q) {
+  const res = await api(`/api/v1/instruments/?search=${encodeURIComponent(q)}`);
+  return res.data || res;
+}
+
 // Live prices via fetch-driven SSE (EventSource cannot send Authorization
 // headers). Reconnects automatically; the server closes each chunk (~60s)
 // so no connection lives forever.

@@ -32,6 +32,7 @@ from core.models import (
     Strategy,
     StrategyRun,
     Trade,
+    Watchlist,
 )
 from market_data.services import get_latest_price
 from security.permissions import (
@@ -77,6 +78,72 @@ class AccountView(APIView):
 
     def get(self, request):
         return Response(AccountSerializer(_account_for(request.user)).data)
+
+
+class AccountMoneyView(APIView):
+    """Add virtual money / withdraw virtual money (paper only, always free)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, action):
+        from decimal import InvalidOperation
+
+        from core.models.audit import AuditLog
+
+        if action not in ("deposit", "withdraw"):
+            return Response(
+                {"errors": ["action must be deposit|withdraw"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            amount = Decimal(str(request.data.get("amount", "")))
+        except InvalidOperation, TypeError:
+            return Response(
+                {"errors": ["amount must be a positive number"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if amount <= 0:
+            return Response(
+                {"errors": ["amount must be a positive number"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if amount > Decimal("100000000"):
+            return Response(
+                {"errors": ["amount exceeds the per-operation cap (Rs 10,00,00,000)"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        account = _account_for(request.user)
+        if action == "withdraw" and amount > account.available_margin:
+            return Response(
+                {"errors": [f"insufficient free balance (have {account.available_margin})"]},
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+        from core.models.accounts import AccountLedgerEntry
+
+        signed = amount if action == "deposit" else -amount
+        account.current_balance += signed
+        equity = account.current_balance + account.unrealized_pnl
+        if equity > account.peak_balance:
+            account.peak_balance = equity
+        account.save(update_fields=["current_balance", "peak_balance", "updated_at"])
+        AccountLedgerEntry.objects.create(
+            account=account,
+            entry_type=AccountLedgerEntry.EntryType.ADJUSTMENT,
+            amount=signed,
+            balance_after=account.current_balance,
+            reference_type="funding",
+            reference_id="",
+            description=f"{action.title()} of {amount} via dashboard",
+        )
+        AuditLog.objects.create(
+            action="CONFIG_CHANGE",
+            user=request.user,
+            account=account,
+            entity_type="account",
+            entity_id=str(account.id),
+            description=f"Paper {action} of {amount}",
+        )
+        return Response(AccountSerializer(account).data)
 
 
 class OrderListCreateView(APIView):
@@ -432,6 +499,112 @@ class RiskEventListView(APIView):
         if action:
             qs = qs.filter(action=action)
         return Response(RiskEventSerializer(qs[:200], many=True).data)
+
+
+class WatchlistListCreateView(APIView):
+    """Own watchlists: list + create (symbols validated against the master)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        rows = Watchlist.objects.filter(user=request.user).order_by("-updated_at")
+        return Response(
+            [
+                {
+                    "id": str(w.id),
+                    "name": w.name,
+                    "symbols": w.symbols,
+                    "updated_at": w.updated_at.isoformat(),
+                }
+                for w in rows
+            ]
+        )
+
+    def post(self, request):
+        from core.models import Instrument as _Instrument
+
+        name = str(request.data.get("name") or "My Watchlist").strip()[:100]
+        symbols = request.data.get("symbols", [])
+        if not isinstance(symbols, list) or not symbols:
+            return Response(
+                {"errors": ["symbols must be a non-empty list"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        valid = set(
+            _Instrument.objects.filter(
+                exchange="NSE", is_active=True, effective_to__isnull=True
+            ).values_list("symbol", flat=True)
+        )
+        watchlist = Watchlist(user=request.user, name=name, symbols=symbols)
+        try:
+            cleaned = watchlist.clean_symbols(valid)
+        except ValueError as exc:
+            return Response({"errors": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
+        watchlist.symbols = cleaned
+        try:
+            watchlist.save()
+        except Exception:
+            return Response(
+                {"errors": [f"a watchlist named {name!r} already exists"]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(
+            {"id": str(watchlist.id), "name": watchlist.name, "symbols": watchlist.symbols},
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class WatchlistDetailView(APIView):
+    """Rename/replace symbols or delete one own watchlist."""
+
+    permission_classes = [IsAuthenticated, IsAccountOwner]
+
+    def _get(self, request, watchlist_id):
+        try:
+            row = Watchlist.objects.get(id=watchlist_id, user=request.user)
+        except Watchlist.DoesNotExist, ValueError, TypeError:
+            return None
+        self.check_object_permissions(request, row)
+        return row
+
+    def get(self, request, watchlist_id):
+        row = self._get(request, watchlist_id)
+        if row is None:
+            return Response({"errors": ["watchlist not found"]}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"id": str(row.id), "name": row.name, "symbols": row.symbols})
+
+    def patch(self, request, watchlist_id):
+        from core.models import Instrument as _Instrument
+
+        row = self._get(request, watchlist_id)
+        if row is None:
+            return Response({"errors": ["watchlist not found"]}, status=status.HTTP_404_NOT_FOUND)
+        if "name" in request.data:
+            row.name = str(request.data["name"]).strip()[:100] or row.name
+        if "symbols" in request.data:
+            if not isinstance(request.data["symbols"], list):
+                return Response(
+                    {"errors": ["symbols must be a list"]}, status=status.HTTP_400_BAD_REQUEST
+                )
+            valid = set(
+                _Instrument.objects.filter(
+                    exchange="NSE", is_active=True, effective_to__isnull=True
+                ).values_list("symbol", flat=True)
+            )
+            row.symbols = request.data["symbols"]
+            try:
+                row.symbols = row.clean_symbols(valid)
+            except ValueError as exc:
+                return Response({"errors": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
+        row.save()
+        return Response({"id": str(row.id), "name": row.name, "symbols": row.symbols})
+
+    def delete(self, request, watchlist_id):
+        row = self._get(request, watchlist_id)
+        if row is None:
+            return Response({"errors": ["watchlist not found"]}, status=status.HTTP_404_NOT_FOUND)
+        row.delete()
+        return Response({"deleted": True})
 
 
 class KillSwitchView(APIView):

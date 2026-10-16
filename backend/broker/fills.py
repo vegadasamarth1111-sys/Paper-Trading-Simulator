@@ -29,6 +29,7 @@ explicit, configurable, and unit-tested:
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 
 Q4 = Decimal("0.0001")
@@ -51,7 +52,7 @@ class MarketSnapshot:
     upper_circuit: Decimal | None = None
     lower_circuit: Decimal | None = None
     latency_ms: int = 300
-    ts: object = None  # exchange timestamp of the quote (UTC datetime or None)
+    ts: datetime | None = None  # exchange timestamp of the quote (UTC)
 
 
 @dataclass(frozen=True)

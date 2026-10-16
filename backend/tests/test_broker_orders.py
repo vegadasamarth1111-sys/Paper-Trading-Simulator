@@ -308,6 +308,48 @@ class TestBracketOCO:
         assert OrderStatus.FILLED in statuses  # target hit
         assert OrderStatus.CANCELLED in statuses  # stop cancelled (OCO)
 
+    def test_legs_matchable_on_silent_feed(self, frozen_clock, account, equity_instrument):
+        """Exits are never trapped: legs spawn AND match with no feed at all.
+
+        No Tick rows exist and the quote source is silent — the entry
+        carries its own quote time, and the exit legs pass the engine
+        because exits only ever answer to the kill switch.
+        """
+        from broker.paper import PaperBroker
+
+        broker = PaperBroker(
+            clock=frozen_clock,
+            price_source=lambda inst: Decimal("2500"),
+            quote_ts_source=lambda inst: None,
+        )
+        quote_ts = datetime(2026, 1, 5, 4, 30, tzinfo=UTC)
+        entry = broker.place_order(
+            account=account,
+            instrument=equity_instrument,
+            side="BUY",
+            order_type="MKT",
+            quantity=10,
+            product_type="MIS",
+            validity="DAY",
+            client_order_id="bo-silent-1",
+            target_price=Decimal("2550"),
+            stoploss_price=Decimal("2450"),
+            stop_loss_price=Decimal("2450"),
+            market_quote_ts=quote_ts,
+        )
+        assert entry.status == OrderStatus.FILLED
+        legs = list(Order.objects.filter(parent_order=entry))
+        assert len(legs) == 2
+        assert {leg.status for leg in legs} == {OrderStatus.OPEN}
+        px = Decimal("2551")
+        broker.process_snapshot(
+            equity_instrument,
+            MarketSnapshot(bid=px, ask=px, ltp=px, bid_qty=1000, ask_qty=1000, ts=quote_ts),
+        )
+        statuses = {Order.objects.get(id=leg.id).status for leg in legs}
+        assert OrderStatus.FILLED in statuses  # target hit
+        assert OrderStatus.CANCELLED in statuses  # stop cancelled (OCO)
+
     def test_ioc_cancels_leftover(self, broker, account, equity_instrument):
         _seed_tick(equity_instrument, price="2500")
         order = broker.place_order(

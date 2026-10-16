@@ -50,6 +50,7 @@ def expire_day_orders(*, as_of: date) -> int:
         placed_at__date__lte=as_of,
     )
     count = 0
+    accounts = set()
     for order in resting:
         previous = order.status
         order.transition_to(OrderStatus.EXPIRED, reason="day validity elapsed")
@@ -60,8 +61,17 @@ def expire_day_orders(*, as_of: date) -> int:
             to_status=OrderStatus.EXPIRED,
             reason="day validity elapsed",
         )
+        accounts.add(order.account_id)
         count += 1
     if count:
+        # Terminal orders release their blocks: margin is derived, so
+        # recompute per touched account (missing this leaks blocked margin
+        # forever — found as a 4.7L drift on a live demo account).
+        from broker.margin import refresh_margin
+        from core.models.accounts import Account
+
+        for account_id in accounts:
+            refresh_margin(Account.objects.get(id=account_id))
         logger.info("Expired %d DAY orders for %s", count, as_of)
     return count
 

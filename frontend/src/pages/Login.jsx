@@ -1,15 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, loggedIn, logout } from '../api';
 
 export default function Login({ onDone }) {
   const [mode, setMode] = useState('login');
-  const [form, setForm] = useState({ username: '', password: '', email: '' });
+  const [form, setForm] = useState({ username: '', password: '', confirm: '', email: '' });
   const [error, setError] = useState('');
 
-  if (loggedIn()) {
-    onDone();
-    return null;
-  }
+  useEffect(() => {
+    if (loggedIn()) onDone();
+  }, [onDone]);
 
   async function submit(e) {
     e.preventDefault();
@@ -24,10 +23,19 @@ export default function Login({ onDone }) {
         localStorage.setItem('pts_access', data.access);
         localStorage.setItem('pts_refresh', data.refresh);
       } else {
+        if (form.password !== form.confirm) {
+          setError('Passwords do not match.');
+          return;
+        }
         await api('/api/v1/auth/register/', {
           method: 'POST',
           auth: false,
-          body: { username: form.username, email: form.email, password: form.password },
+          body: {
+            username: form.username,
+            email: form.email,
+            password: form.password,
+            password_confirm: form.confirm,
+          },
         });
         setMode('login');
         setError('Registered — now log in.');
@@ -48,7 +56,10 @@ export default function Login({ onDone }) {
         {mode === 'register' && (
           <input placeholder="Email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
         )}
-        <input type="password" placeholder="Password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+        <input type="password" placeholder="Password (min 12 chars)" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} required />
+        {mode === 'register' && (
+          <input type="password" placeholder="Confirm password" value={form.confirm} onChange={(e) => setForm({ ...form, confirm: e.target.value })} required />
+        )}
         {error && <p className="error">{error}</p>}
         <button className="action" type="submit">{mode === 'login' ? 'Log in' : 'Register'}</button>
       </form>

@@ -205,6 +205,28 @@ class TestEOD:
         order.refresh_from_db()
         assert order.status == OrderStatus.EXPIRED
 
+    def test_expired_orders_release_margin(self, broker, account, equity_instrument):
+        """Expired DAY orders must unblock margin (leak found: 4.7L stuck)."""
+        _tick(equity_instrument)
+        order = broker.place_order(
+            account=account,
+            instrument=equity_instrument,
+            side="BUY",
+            order_type="LMT",
+            quantity=10,
+            price=Decimal("2400"),
+            product_type="MIS",
+            validity="DAY",
+            client_order_id="eod-margin-1",
+            stop_loss_price=Decimal("2350"),
+        )
+        account.refresh_from_db()
+        assert account.margin_used > 0
+        Order.objects.filter(id=order.id).update(placed_at=datetime(2026, 1, 5, 5, 0, tzinfo=UTC))
+        assert expire_day_orders(as_of=date(2026, 1, 5)) == 1
+        account.refresh_from_db()
+        assert account.margin_used == 0
+
     def test_mis_squared_off_delivery_left(self, broker, account, equity_instrument):
         _tick(equity_instrument, price="2500")
         broker.place_order(

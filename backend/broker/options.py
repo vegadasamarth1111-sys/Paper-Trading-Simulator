@@ -152,4 +152,9 @@ def settle_expired_options(*, account: Account, as_of: date, spot_of) -> dict:
         summary["settled"] += 1
         summary["credited"] += intrinsic * trade.quantity - breakdown.total
         logger.info("Option %s cash-settled @ %s (intrinsic)", instrument.symbol, intrinsic)
+    if summary["settled"] or summary["worthless"]:
+        # Closed positions release their margin: recompute from truth.
+        from broker.margin import refresh_margin
+
+        refresh_margin(account)
     return summary

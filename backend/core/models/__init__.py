@@ -16,6 +16,7 @@ from core.models.risk import RiskConfig, RiskEvent
 from core.models.strategies import Signal, Strategy, StrategyRun
 from core.models.trades import Trade
 from core.models.trial import TrialDay
+from core.models.watchlist import Watchlist
 
 __all__ = [
     "Account",
@@ -34,6 +35,7 @@ __all__ = [
     "StrategyRun",
     "Signal",
     "TrialDay",
+    "Watchlist",
     "AuditLog",
     "SystemConfig",
 ]

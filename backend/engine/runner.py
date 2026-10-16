@@ -322,11 +322,13 @@ class EventRunner:
     def _match_all(self, candle: CandleView) -> None:
         """Let resting stops/targets react to this candle's close."""
         from broker.fills import MarketSnapshot
+        from market_data.candles import interval_end
 
         quote = self._price_of(candle.symbol)
         if quote is None:
             return
-        snapshot = MarketSnapshot(bid=quote, ask=quote, ltp=quote)
+        close_ts = interval_end(candle.open_ts, candle.timeframe)
+        snapshot = MarketSnapshot(bid=quote, ask=quote, ltp=quote, ts=close_ts)
         instrument = Instrument.objects.filter(
             symbol=candle.symbol, exchange="NSE", is_active=True, effective_to__isnull=True
         ).first()
@@ -341,7 +343,7 @@ class EventRunner:
         ).first()
         if instrument is None:
             return
-        snapshot = MarketSnapshot(bid=tick.ltp, ask=tick.ltp, ltp=tick.ltp)
+        snapshot = MarketSnapshot(bid=tick.ltp, ask=tick.ltp, ltp=tick.ltp, ts=tick.exchange_ts)
         self.broker.process_snapshot(instrument, snapshot)
 
     def _close_run(self, run: StrategyRun, result: RunResult) -> RunResult:
