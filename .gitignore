@@ -142,3 +142,8 @@ dmypy.json
 # detect-secrets: the baseline IS tracked (CI diffs against it).
 # It contains only hashes of already-vetted findings, never raw secrets.
 # .secrets.baseline
+
+# ML publisher drop directory (score artifacts are data, not code).
+# Keep the directory with a marker; never commit downloaded scores.
+ml_scores/*
+!ml_scores/.gitkeep

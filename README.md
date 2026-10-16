@@ -64,11 +64,13 @@ docker-compose up --build
 │   ├── risk/                # Phase 3: 12-rule engine, kill switch, limit seeding
 │   │   └── management/commands/  # seed_risk_defaults, kill_switch
 │   ├── engine/              # Phase 4: strategies, sizing, backtest/replay runner
-│   │   ├── strategies/      # sma_cross + donchian baselines + registry
+│   │   ├── strategies/      # sma_cross + donchian + ranking baselines + registry
 │   │   └── management/commands/  # backtest, replay
+│   ├── ml/                  # Phase 6: ranking store, provider, ingest, refresh task
+│   │   └── management/commands/  # load_scores
 │   ├── api/                 # Phase 5: DRF trading API (orders, pnl, risk, kill, CSV, SSE)
 │   ├── alerts/              # Phase 5: Telegram sender (free Bot API, never raises)
-│   ├── tests/               # 607 pytest tests (30 API + 9 alerts + 41 engine + ...)
+│   ├── tests/               # 631 pytest tests (24 ML + 41 engine + 30 API + ...)
 │   └── requirements/        # base.txt / prod.txt / dev.txt (pinned)
 ├── docker/                  # Dockerfiles
 ├── .github/workflows/ci.yml # CI: lint, bandit, pip-audit, secrets, tests, deploy checks
@@ -124,6 +126,26 @@ Sizing risks 1% of allocation per stop distance, rounded to lots; the same
 broker + risk code runs backtest (closed candles), replay (recorded ticks),
 and live paper — replaying a day twice gives byte-identical financials
 (the exit-gate test).
+
+## ML Ranking (Phase 6 — publisher scores in, versioned signals out)
+
+Training stays in your pipeline; this service only READS scores
+(zero new dependencies):
+
+```bash
+# Publish a ranking artifact (your pipeline's output)
+python manage.py load_scores --file scores.csv --model-version xgb-rank@v3 \
+  --score-date 2026-01-09 --horizon 1d --features-as-of 2026-01-08
+# Or drop files in ml_scores/ as scores_<horizon>_<date>_<features>_<version>.csv
+# Backtest the ranking strategy like any other baseline
+python manage.py backtest --account <UUID> --strategy ranking --symbols RELIANCE,TCS \
+  --start 2026-01-09T00:00:00+00:00 --end 2026-01-10T00:00:00+00:00
+```
+
+Look-ahead is structural, not promised: rows carry publication date AND
+newest feature timestamp, and the provider only serves rows with both
+strictly before the trade date. Every signal persists its publication's
+`model_version`, and the run record stamps it too (the exit gate).
 
 ## Trading API + Dashboard (Phase 5 — DRF, React, Telegram, all free)
 
@@ -234,7 +256,8 @@ This project treats security as a first-class concern:
 | 2. Paper Broker Core | ✅ Done — fills, costs, margin, ledger, EOD (broker-calculator check is yours) |
 | 3. Risk Engine | ✅ Done — 12 rules + kill switch, every rule has a blocking test |
 | 4. Strategy Framework + Replay | ✅ Done — baselines, sizing, deterministic runner |
-| 5. API + Dashboard | 🔨 In Progress — endpoints, React app, Telegram built; needs your review |
+| 5. API + Dashboard | ✅ Done — endpoints, React app, Telegram; E2E proven on live data |
+| 6. ML Integration | 🔨 In Progress — score store, provider, ranking strategy built; needs your review |
 | 2. Paper Broker Core | ⏳ Planned |
 | 3. Risk Engine | ⏳ Planned |
 | 4. Strategy Framework | ⏳ Planned |

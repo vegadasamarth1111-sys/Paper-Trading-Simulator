@@ -40,7 +40,7 @@ def _candles(closes: list[str], symbol: str = "RELIANCE") -> list[CandleView]:
 
 class TestRegistry:
     def test_known_strategies(self):
-        assert set(REGISTRY) == {"sma_cross", "donchian"}
+        assert set(REGISTRY) == {"sma_cross", "donchian", "ranking"}
         assert isinstance(get_strategy("sma_cross"), SMACrossover)
 
     def test_unknown_name_raises(self):

@@ -81,6 +81,7 @@ LOCAL_APPS = [
     "engine",
     "api",
     "alerts",
+    "ml",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -366,6 +367,13 @@ ANGEL_API_KEY = config("ANGEL_API_KEY", default="")
 ANGEL_CLIENT_ID = config("ANGEL_CLIENT_ID", default="")
 ANGEL_PASSWORD = config("ANGEL_PASSWORD", default="")
 ANGEL_TOTP_SECRET = config("ANGEL_TOTP_SECRET", default="")
+
+# =============================================================================
+# ML SCORING — Phase 6 (file drop directory for publisher artifacts)
+# =============================================================================
+# Your training pipeline drops ranking files here; the nightly task
+# ingests them. Empty/absent directory = nothing to ingest (not an error).
+ML_SCORE_DIR = config("ML_SCORE_DIR", default="ml_scores")
 
 # =============================================================================
 # PAPER BROKER — Phase 2 fill realism (all safe defaults; env overrides)

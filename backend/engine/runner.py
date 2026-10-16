@@ -367,6 +367,8 @@ class EventRunner:
         result.realized_pnl = self.account.realized_pnl - self._realized_start
         run.realized_pnl = result.realized_pnl
         run.trades_count = result.trades
+        # Model provenance for ML-driven runs (baselines leave it blank).
+        run.model_version = getattr(self.strategy, "run_model_version", "") or run.model_version
         run.is_running = False
         run.ended_at = _as_utc(self.clock.now())
         run.save()

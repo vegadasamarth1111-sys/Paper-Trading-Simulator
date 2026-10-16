@@ -1,11 +1,13 @@
 """Baseline strategy registry (Phase 4). Name -> class, no magic imports."""
 
 from engine.strategies.donchian import DonchianBreakout
+from engine.strategies.ranking import RankingStrategy
 from engine.strategies.sma import SMACrossover
 
 REGISTRY: dict[str, type] = {
     SMACrossover.name: SMACrossover,
     DonchianBreakout.name: DonchianBreakout,
+    RankingStrategy.name: RankingStrategy,
 }
 
 
