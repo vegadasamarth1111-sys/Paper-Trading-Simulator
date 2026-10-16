@@ -295,13 +295,6 @@ This project treats security as a first-class concern:
 | 6. ML Integration | ✅ Done — score store, provider, ranking strategy; look-ahead structural |
 | 7. Hardening | ✅ Done — chaos/load tests, encrypted backups, runbook, security review |
 | 8. Live Paper Trial | 🔨 In Progress — harness built (trial_daily/report/note); gate opens after 30 trading days |
-| 2. Paper Broker Core | ⏳ Planned |
-| 3. Risk Engine | ⏳ Planned |
-| 4. Strategy Framework | ⏳ Planned |
-| 5. API & Dashboard | ⏳ Planned |
-| 6. ML Integration | ⏳ Planned |
-| 7. Hardening | ⏳ Planned |
-| 8. Live Paper Trial | ⏳ Planned |
 
 ## License
 
