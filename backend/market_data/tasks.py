@@ -70,4 +70,11 @@ def data_quality_report_task(report_date: str | None = None) -> dict:
     day = date.fromisoformat(report_date) if report_date else datetime.now(IST).date()
     report = build_daily_report(day)
     logger.info("Data-quality report %s: suspect=%s", report, report.is_suspect)
+    if report.is_suspect:
+        try:
+            from alerts.service import notify_data_quality
+
+            notify_data_quality(report)
+        except Exception:  # noqa: BLE001 - alerts never break the job
+            logger.exception("Data-quality alert failed")
     return {"report_id": report.id, "is_suspect": report.is_suspect}

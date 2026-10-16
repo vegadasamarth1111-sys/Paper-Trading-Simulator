@@ -130,6 +130,8 @@ jobs:
             --cov=broker \
             --cov=risk \
             --cov=engine \
+            --cov=api \
+            --cov=alerts \
             --cov-report=xml \
             --cov-report=term-missing \
             --tb=short
@@ -195,3 +197,27 @@ jobs:
       - name: mypy
         working-directory: backend
         run: mypy .
+
+  # ---------------------------------------------------------------------------
+  # Frontend — build the React dashboard (no surprises at deploy time)
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Dashboard Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Production build
+        working-directory: frontend
+        run: npm run build

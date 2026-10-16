@@ -18,6 +18,8 @@ urlpatterns = [
     path("api/v1/instruments/", include("instruments.urls")),
     # Market data (Phase 1: latest prices, candles, data quality)
     path("api/v1/market/", include("market_data.urls")),
+    # Trading API (Phase 5: accounts, orders, positions, strategies, risk)
+    path("api/v1/", include("api.urls")),
     # Admin — protected by AdminIPWhitelistMiddleware
     path("admin/", admin.site.urls),
 ]

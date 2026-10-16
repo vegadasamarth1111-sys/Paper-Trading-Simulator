@@ -79,6 +79,8 @@ LOCAL_APPS = [
     "broker",
     "risk",
     "engine",
+    "api",
+    "alerts",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -234,6 +236,7 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "burst": "60/min",
         "sustained": config("RATE_LIMIT_DEFAULT", default="1000/hour"),
+        "orders": config("RATE_LIMIT_ORDERS", default="30/min"),
     },
     "DEFAULT_RENDERER_CLASSES": (
         "rest_framework.renderers.JSONRenderer",

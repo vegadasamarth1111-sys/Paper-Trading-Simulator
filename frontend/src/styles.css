@@ -1,0 +1,74 @@
+/* Paper Trading Simulator — minimal dark dashboard (no UI framework). */
+
+:root {
+  --bg: #0f1420;
+  --panel: #1a2233;
+  --line: #2a3550;
+  --text: #dbe4f3;
+  --muted: #8b98b3;
+  --green: #35c48d;
+  --red: #e5605e;
+  --amber: #e0a63e;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+a { color: inherit; }
+.app { display: flex; min-height: 100vh; }
+nav {
+  width: 210px;
+  background: var(--panel);
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-right: 1px solid var(--line);
+}
+nav h1 { font-size: 15px; margin: 0 0 14px 8px; }
+nav button {
+  background: none;
+  border: 0;
+  color: var(--muted);
+  text-align: left;
+  padding: 9px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+nav button.active, nav button:hover { background: #25304a; color: var(--text); }
+nav .logout { margin-top: auto; color: var(--red); }
+main { flex: 1; padding: 22px; max-width: 1100px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+.card .label { font-size: 12px; color: var(--muted); }
+.card .value { font-size: 20px; margin-top: 4px; }
+.pos { color: var(--green); }
+.neg { color: var(--red); }
+.warn { color: var(--amber); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--panel); border-radius: 8px; overflow: hidden; }
+th, td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 600; }
+form.inline { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }
+input, select, button.action {
+  background: #111a2c;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+button.action { cursor: pointer; background: #274067; }
+button.action.danger { background: #5c2222; }
+button.action:disabled { opacity: 0.5; cursor: default; }
+.error { color: var(--red); margin: 8px 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 16px; }
+.panel h3 { margin: 0 0 10px 0; font-size: 14px; }
+.login { max-width: 340px; margin: 12vh auto; }
+.login input { width: 100%; margin-bottom: 10px; }
+.login button { width: 100%; }
+.kill { font-size: 16px; padding: 14px; width: 100%; }

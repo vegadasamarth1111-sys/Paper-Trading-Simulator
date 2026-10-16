@@ -66,12 +66,15 @@ docker-compose up --build
 │   ├── engine/              # Phase 4: strategies, sizing, backtest/replay runner
 │   │   ├── strategies/      # sma_cross + donchian baselines + registry
 │   │   └── management/commands/  # backtest, replay
-│   ├── tests/               # 577 pytest tests (41 engine + 28 risk + 113 broker + 73 market data)
+│   ├── api/                 # Phase 5: DRF trading API (orders, pnl, risk, kill, CSV, SSE)
+│   ├── alerts/              # Phase 5: Telegram sender (free Bot API, never raises)
+│   ├── tests/               # 607 pytest tests (30 API + 9 alerts + 41 engine + ...)
 │   └── requirements/        # base.txt / prod.txt / dev.txt (pinned)
 ├── docker/                  # Dockerfiles
 ├── .github/workflows/ci.yml # CI: lint, bandit, pip-audit, secrets, tests, deploy checks
 ├── pyproject.toml           # ruff / mypy / bandit / pytest / coverage config
-└── engine/  frontend/       # Phase 5+ (not yet created)
+├── frontend/                # Phase 5: React dashboard (Vite, free libs only)
+│   └── src/pages/           # Login, Dashboard, Orders, Strategies, Risk, DataHealth
 ```
 
 ## Paper Broker (Phase 2 — ₹10L paper, Zerodha-style costs, no naked shorts)
@@ -122,6 +125,30 @@ broker + risk code runs backtest (closed candles), replay (recorded ticks),
 and live paper — replaying a day twice gives byte-identical financials
 (the exit-gate test).
 
+## Trading API + Dashboard (Phase 5 — DRF, React, Telegram, all free)
+
+| Surface | Routes |
+|---|---|
+| Account | `GET /api/v1/account/` |
+| Orders | `POST/GET /api/v1/orders/`, `GET/PATCH/DELETE /api/v1/orders/<id>/` |
+| Trades / positions / PnL | `GET /api/v1/trades/`, `/positions/`, `/pnl/` (90-day equity curve) |
+| Strategies / signals | `GET /api/v1/strategies/`, `POST .../<id>/start\|stop/`, `GET /api/v1/signals/` |
+| Risk | `GET/PATCH /api/v1/risk/`, `GET /api/v1/risk-events/` |
+| Kill switch | `POST /api/v1/kill-switch/`, `POST /api/v1/kill-switch/release/` |
+| Reports / health / stream | `GET /api/v1/reports/daily.csv`, `/data-health/`, `/stream/prices/` (SSE) |
+
+```bash
+cd frontend
+npm install
+npm run dev      # dashboard at http://localhost:5173 (proxies /api to Django)
+npm run build    # production bundle in frontend/dist/
+```
+
+Telegram (free @BotFather bot): set `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`
+in `.env` to receive kill-switch, reconciliation-mismatch, suspect-day,
+and EOD-summary alerts. Unset = silent no-op; the sender never raises
+into trading paths and never ships secrets.
+
 ## Market Data (Phase 1 — free tier, zero keys)
 
 No paid Kite Connect. No keys in `.env` required today:
@@ -159,6 +186,7 @@ Every one of these runs in CI and **blocks the merge on failure** — there are 
 | Dependency CVEs | `pip-audit` on `base.txt`, `prod.txt`, `dev.txt` |
 | Leaked secrets | `detect-secrets-hook` against `.secrets.baseline` |
 | Tests + coverage | `pytest` (coverage floor 80%, currently 91%) |
+| Dashboard build | `npm run build` in `frontend/` (CI job) |
 | Migration drift | `manage.py makemigrations --check --dry-run` |
 | Deploy readiness | `manage.py check --deploy --fail-level WARNING` |
 | Types | `mypy` with django-stubs |
@@ -205,7 +233,8 @@ This project treats security as a first-class concern:
 | 1. Data Layer | ✅ Done — ticks/candles/providers/ingestion/quality on free tier (live 5-day proof pending) |
 | 2. Paper Broker Core | ✅ Done — fills, costs, margin, ledger, EOD (broker-calculator check is yours) |
 | 3. Risk Engine | ✅ Done — 12 rules + kill switch, every rule has a blocking test |
-| 4. Strategy Framework + Replay | 🔨 In Progress — baselines, sizing, deterministic runner built; needs your review |
+| 4. Strategy Framework + Replay | ✅ Done — baselines, sizing, deterministic runner |
+| 5. API + Dashboard | 🔨 In Progress — endpoints, React app, Telegram built; needs your review |
 | 2. Paper Broker Core | ⏳ Planned |
 | 3. Risk Engine | ⏳ Planned |
 | 4. Strategy Framework | ⏳ Planned |

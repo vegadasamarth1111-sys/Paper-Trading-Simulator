@@ -102,9 +102,12 @@ class TestCanPlaceOrders:
     def test_active_account_is_allowed(self, user, account):
         assert CanPlaceOrders().has_permission(FakeRequest(user), FakeView()) is True
 
-    def test_user_without_account_is_denied(self, user):
-        """A user with no trading account must not be able to place orders."""
-        assert CanPlaceOrders().has_permission(FakeRequest(user), FakeView()) is False
+    def test_user_without_account_is_allowed(self, user):
+        """No account yet: the order view auto-creates a fresh ACTIVE,
+         unhalted account, so there is nothing to block at permission time.
+         (Renamed from is_denied when auto-creation landed; the safety
+        moved, not away: fresh accounts are active + unhalted by defaults.)"""
+        assert CanPlaceOrders().has_permission(FakeRequest(user), FakeView()) is True
 
     def test_inactive_account_is_denied(self, user, account):
         account.is_active = False

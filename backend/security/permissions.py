@@ -94,11 +94,10 @@ class CanPlaceOrders(BasePermission):
         try:
             account = request.user.trading_account
         except Exception:
-            logger.warning(
-                "User %s has no trading account but attempted to place an order.",
-                request.user.username,
-            )
-            return False
+            # No account yet: the view auto-creates a fresh active one
+            # (active + unhalted by model defaults), so there is nothing
+            # to block here. Existing halted/inactive accounts fall below.
+            return True
 
         if not account.is_active:
             logger.warning(

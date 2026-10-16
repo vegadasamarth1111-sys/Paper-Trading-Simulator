@@ -36,6 +36,12 @@ def settle_day_task(account_id: str, day: str | None = None) -> dict:
     sqoff = square_off_intraday(account=account, price_of=_price_of, broker=broker)
     expiry = settle_expired_options(account=account, as_of=trading_day, spot_of=_price_of)
     snapshot = settle_day(account=account, day=trading_day, price_of=_price_of)
+    try:
+        from alerts.service import notify_eod_summary
+
+        notify_eod_summary(account, snapshot)
+    except Exception:  # noqa: BLE001 - alerts never break settlement
+        logger.exception("EOD summary alert failed")
     return {
         "expired_orders": expired,
         "squared_off": sqoff["squared"],
@@ -58,6 +64,12 @@ def reconcile_task(account_id: str) -> dict:
             account_id,
             [(m.area, m.key, m.stored, m.rebuilt) for m in report.mismatches],
         )
+        try:
+            from alerts.service import notify_reconciliation
+
+            notify_reconciliation(account, report.mismatches)
+        except Exception:  # noqa: BLE001 - alerts never break the job
+            logger.exception("Reconciliation alert failed")
     return {
         "ok": report.ok,
         "mismatches": [
