@@ -147,3 +147,6 @@ dmypy.json
 # Keep the directory with a marker; never commit downloaded scores.
 ml_scores/*
 !ml_scores/.gitkeep
+
+# Backup artifacts (encrypted dumps are still data — never commit).
+backups/

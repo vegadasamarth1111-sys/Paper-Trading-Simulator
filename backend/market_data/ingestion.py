@@ -32,8 +32,11 @@ from .validation import ValidationThresholds, validate_tick
 logger = logging.getLogger("core")
 UTC = ZoneInfo("UTC")
 
-# Yahoo/Angel return at most this many symbols per call comfortably.
-MAX_SUBSCRIPTIONS = 50
+# Yahoo/Angel tolerate larger polling watchlists; broker websockets fragment
+# subscriptions when the dedicated feed arrives (see AngelOneProvider).
+# The seed universe (53 symbols) must always fit — a smaller cap would
+# crash the default poll_prices run (regression-tested in test_load.py).
+MAX_SUBSCRIPTIONS = 100
 
 
 class PollingIngestor:

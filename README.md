@@ -53,7 +53,8 @@ docker-compose up --build
 ```
 ├── backend/                 # Django API + domain models
 │   ├── config/              # Settings (base / development / production / testing)
-│   ├── core/                # Domain models, clock, enums, types, migrations
+│   ├── core/                # Domain models, clock, enums, backups, types
+│   │   └── management/commands/  # backup_db, restore_db
 │   ├── security/            # Auth, permissions, middleware, throttles
 │   ├── instruments/         # Instrument master loader + services
 │   ├── market_data/         # Phase 1: ticks, candles, providers, ingestion, quality
@@ -70,7 +71,7 @@ docker-compose up --build
 │   │   └── management/commands/  # load_scores
 │   ├── api/                 # Phase 5: DRF trading API (orders, pnl, risk, kill, CSV, SSE)
 │   ├── alerts/              # Phase 5: Telegram sender (free Bot API, never raises)
-│   ├── tests/               # 631 pytest tests (24 ML + 41 engine + 30 API + ...)
+│   ├── tests/               # 660 pytest tests (29 hardening + 24 ML + ...)
 │   └── requirements/        # base.txt / prod.txt / dev.txt (pinned)
 ├── docker/                  # Dockerfiles
 ├── .github/workflows/ci.yml # CI: lint, bandit, pip-audit, secrets, tests, deploy checks
@@ -146,6 +147,21 @@ Look-ahead is structural, not promised: rows carry publication date AND
 newest feature timestamp, and the provider only serves rows with both
 strictly before the trade date. Every signal persists its publication's
 `model_version`, and the run record stamps it too (the exit gate).
+
+## Hardening (Phase 7 — chaos, load, backups, runbook)
+
+```bash
+cd backend
+python manage.py backup_db     # encrypted dump + manifest (needs BACKUP_ENCRYPTION_KEY)
+python manage.py restore_db --file <path> --force   # hash-verified, fails closed
+```
+
+Full procedures live in `docs/RUNBOOK.md` (feed down, DB crash, kill
+switch, deploy windows, restore drills) and the point-in-time posture
+in `docs/SECURITY.md` (re-run commands included). Chaos scenarios
+(feed death, mid-day restart, duplicate delivery, stale storms,
+mid-fill DB failure, clock jumps) and scaled load tests run in CI
+under `tests/test_chaos.py` and `tests/test_load.py`.
 
 ## Trading API + Dashboard (Phase 5 — DRF, React, Telegram, all free)
 
@@ -257,7 +273,8 @@ This project treats security as a first-class concern:
 | 3. Risk Engine | ✅ Done — 12 rules + kill switch, every rule has a blocking test |
 | 4. Strategy Framework + Replay | ✅ Done — baselines, sizing, deterministic runner |
 | 5. API + Dashboard | ✅ Done — endpoints, React app, Telegram; E2E proven on live data |
-| 6. ML Integration | 🔨 In Progress — score store, provider, ranking strategy built; needs your review |
+| 6. ML Integration | ✅ Done — score store, provider, ranking strategy; look-ahead structural |
+| 7. Hardening | 🔨 In Progress — chaos/load tests, backups, runbook built; needs your review |
 | 2. Paper Broker Core | ⏳ Planned |
 | 3. Risk Engine | ⏳ Planned |
 | 4. Strategy Framework | ⏳ Planned |

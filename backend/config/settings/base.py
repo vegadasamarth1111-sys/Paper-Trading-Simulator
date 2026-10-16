@@ -349,6 +349,14 @@ CELERY_TIMEZONE = "UTC"
 CELERY_BEAT_SCHEDULER = "django_celery_beat.schedulers:DatabaseScheduler"
 
 # =============================================================================
+# BACKUPS — Phase 7 (encrypted dumps; key has NO default by design)
+# =============================================================================
+# Fernet key (generate: python -c "from cryptography.fernet import Fernet;
+# print(Fernet.generate_key().decode())"). Empty = backup_db REFUSES to run.
+BACKUP_ENCRYPTION_KEY = config("BACKUP_ENCRYPTION_KEY", default="")
+BACKUP_DIR = config("BACKUP_DIR", default="backups")
+
+# =============================================================================
 # MARKET DATA — Phase 1 (free tier)
 # Yahoo is the default because it needs ZERO keys. Angel One's public
 # master is also keyless; only Angel QUOTES need credentials (absent today

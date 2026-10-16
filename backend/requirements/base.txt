@@ -63,3 +63,7 @@ structlog==26.1.0
 
 # Schema validation for market data
 pydantic==2.14.0
+
+# Backup encryption (Fernet/AES for encrypted database backups, Phase 7).
+# Well-audited, ships prebuilt wheels, clears pip-audit as pinned.
+cryptography==50.0.2

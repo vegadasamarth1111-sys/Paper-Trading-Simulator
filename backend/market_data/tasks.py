@@ -52,7 +52,7 @@ def poll_once_task(symbols: list[str] | None = None) -> dict:
     from market_data.universe import get_seed_symbols
 
     provider = get_provider()
-    watchlist = symbols or get_seed_symbols()[:50]
+    watchlist = symbols or get_seed_symbols()
     ingestor = PollingIngestor(
         provider,  # type: ignore[arg-type]
         watchlist,
