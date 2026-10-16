@@ -60,6 +60,11 @@ class CheckRequest:
     strategy_run: StrategyRun | None = None
     client_order_id: str = ""
     exclude_order_id: UUID | str | None = None
+    # Tick age in seconds, measured by the CALLER against its own clock.
+    # When given, the stale-data rule judges this age instead of the live
+    # feed — this is how backtest/replay stay in simulated time. Live
+    # callers leave it None and the live feed is consulted.
+    quote_age_seconds: float | None = None
     now: datetime | None = None
 
 
@@ -228,12 +233,18 @@ class RiskEngine:
                 )
 
         # 4. Stale data — never trade a symbol the feed has abandoned.
+        # Simulated runs pass their own quote age (simulated time); live
+        # callers fall through to the live feed below.
         _, _, stale_on = _limit(request.account, request.strategy_run, RiskRuleType.STALE_DATA)
         if stale_on:
             stale_value, _, _ = _limit(
                 request.account, request.strategy_run, RiskRuleType.STALE_DATA
             )
-            age = _tick_age_seconds(request.instrument.symbol, now)
+            age: float | None
+            if request.quote_age_seconds is not None:
+                age = request.quote_age_seconds
+            else:
+                age = _tick_age_seconds(request.instrument.symbol, now)
             if age is None:
                 return _blocked(
                     request,
@@ -472,3 +483,17 @@ def _day_start_and_pnl(account: Account, day) -> tuple[Decimal, Decimal]:
         start = previous.total_equity
         day_pnl = account.realized_pnl - previous.cumulative_pnl
     return start, day_pnl
+
+
+def position_size_cap_pct(account: Account, strategy_run=None) -> Decimal | None:
+    """
+    Effective position-size percentage cap (None when disabled or unset).
+
+    The sizer reads this to keep notional inside the risk limit UP FRONT,
+    instead of emitting orders the engine must reject. The engine remains
+    the final word — this is alignment, not delegation.
+    """
+    _, pct, enabled = _limit(account, strategy_run, RiskRuleType.MAX_POSITION_SIZE)
+    if not enabled:
+        return None
+    return pct

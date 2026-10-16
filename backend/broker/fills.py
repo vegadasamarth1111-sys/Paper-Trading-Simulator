@@ -51,6 +51,7 @@ class MarketSnapshot:
     upper_circuit: Decimal | None = None
     lower_circuit: Decimal | None = None
     latency_ms: int = 300
+    ts: object = None  # exchange timestamp of the quote (UTC datetime or None)
 
 
 @dataclass(frozen=True)

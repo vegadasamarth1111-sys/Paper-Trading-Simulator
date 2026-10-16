@@ -27,6 +27,8 @@ configured delay (passed in by the caller); latency_ms is audit metadata.
 """
 
 import logging
+from collections.abc import Callable
+from datetime import datetime
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
@@ -78,20 +80,51 @@ def _cost_rates() -> CostRates:
     return active_rates()
 
 
-def _snapshot_for(instrument: Instrument) -> MarketSnapshot | None:
+def _latest_market_price(instrument: Instrument) -> Decimal | None:
+    """Default quote source: latest known market price (DB/cache fallback)."""
+    from market_data.services import get_latest_price
+
+    quote = get_latest_price(instrument.symbol)
+    return quote["ltp"] if quote else None
+
+
+def _latest_market_quote(instrument: Instrument) -> tuple[Decimal | None, object]:
+    """Default quote source with timestamp: (ltp, exchange_ts|None)."""
+    from market_data.services import get_latest_price
+
+    quote = get_latest_price(instrument.symbol)
+    if quote is None:
+        return None, None
+    return quote["ltp"], quote["ts"]
+
+
+def _latest_quote_ts(instrument: Instrument) -> datetime | None:
+    """Default quote-timestamp source: exchange ts of the latest price."""
+    from market_data.services import get_latest_price
+
+    quote = get_latest_price(instrument.symbol)
+    if quote is None:
+        return None
+    ts = quote["ts"]
+    if ts.tzinfo is None:
+        return ts.replace(tzinfo=UTC)
+    return ts.astimezone(UTC)
+
+
+def _snapshot_for(
+    instrument: Instrument, price_source: Callable[[Instrument], Decimal | None]
+) -> MarketSnapshot | None:
     """
     Best current quote for immediate market-order pricing.
 
     Free tier has LTP only (no depth feed), so bid == ask == ltp with zero
     depth — market orders fill in full at ltp +/- slippage. Depth-aware
     partial fills engage as soon as a depth feed provides quantities.
+    The quote timestamp rides along for the risk stale-data rule.
     """
-    from market_data.services import get_latest_price
-
-    quote = get_latest_price(instrument.symbol)  # type: ignore[attr-defined]
-    if quote is None:
+    ltp = price_source(instrument)
+    if ltp is None:
         return None
-    ltp = quote["ltp"]
     return MarketSnapshot(
         bid=ltp,
         ask=ltp,
@@ -105,11 +138,24 @@ def _snapshot_for(instrument: Instrument) -> MarketSnapshot | None:
 class PaperBroker(BrokerInterface):
     """Simulated broker. All state changes are transactional + audited."""
 
-    def __init__(self, clock: Clock | None = None) -> None:
+    def __init__(
+        self,
+        clock: Clock | None = None,
+        price_source: Callable[[Instrument], Decimal | None] | None = None,
+        quote_ts_source: Callable[[Instrument], datetime | None] | None = None,
+    ) -> None:
         # Single source of time (plan section 2): the risk engine judges
         # the trading window against this clock. Tests inject a REPLAY
         # clock frozen inside market hours; production uses wall time.
         self._clock = clock or Clock(mode=ClockMode.LIVE)
+        # Quote source for immediate pricing. Default reads the latest
+        # known market price; backtest/replay inject the simulated feed
+        # so historical runs never depend on (or pollute) live state.
+        self._price_source = price_source or _latest_market_price
+        # Quote timestamps feed the risk stale-data rule. Default reads
+        # the live feed; simulated runs inject simulated timestamps so
+        # backtests are judged against simulated time, not wall time.
+        self._quote_ts_source = quote_ts_source or _latest_quote_ts
 
     # ------------------------------------------------------------------
     # Placement
@@ -134,6 +180,7 @@ class PaperBroker(BrokerInterface):
         signal_id: str | None = None,
         stop_loss_price: Decimal | None = None,
         skip_risk: bool = False,
+        market_quote_ts: datetime | None = None,
     ) -> Order:
         from core.models.orders import Order, OrderEvent
 
@@ -234,6 +281,13 @@ class PaperBroker(BrokerInterface):
         if not skip_risk:
             from risk.engine import CheckRequest, RiskEngine
 
+            quote_ts = market_quote_ts or self._quote_ts_source(instrument)
+            quote_age: float | None = None
+            if quote_ts is not None:
+                moment = self._clock.now()
+                if moment.tzinfo is None:
+                    moment = moment.replace(tzinfo=UTC)
+                quote_age = (moment - quote_ts).total_seconds()
             decision = RiskEngine.check(
                 CheckRequest(
                     account=account,
@@ -249,6 +303,7 @@ class PaperBroker(BrokerInterface):
                     strategy_run=strategy_run,
                     client_order_id=client_order_id,
                     exclude_order_id=order.id,
+                    quote_age_seconds=quote_age,
                     now=self._clock.now(),
                 )
             )
@@ -312,7 +367,7 @@ class PaperBroker(BrokerInterface):
 
         # Market orders match immediately against the visible quote.
         if order_type == OrderType.MARKET:
-            snapshot = _snapshot_for(instrument)
+            snapshot = _snapshot_for(instrument, self._price_source)
             if snapshot is None:
                 refresh_margin(account)
                 order.transition_to(OrderStatus.REJECTED, reason="no quote (stale data)")
@@ -671,10 +726,7 @@ class PaperBroker(BrokerInterface):
         return order.price or snapshot.ltp  # type: ignore[attr-defined]
 
     def _reference_price(self, instrument: Instrument) -> Decimal | None:
-        from market_data.services import get_latest_price
-
-        quote = get_latest_price(instrument.symbol)  # type: ignore[attr-defined]
-        return quote["ltp"] if quote else None
+        return self._price_source(instrument)
 
     def _open_quantity(self, account: Account, instrument: Instrument) -> int:
         from core.models.positions import Position

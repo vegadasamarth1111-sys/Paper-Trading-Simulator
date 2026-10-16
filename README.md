@@ -63,12 +63,15 @@ docker-compose up --build
 │   │   └── management/commands/  # load_cost_table, verify_costs, reconcile, settle_day
 │   ├── risk/                # Phase 3: 12-rule engine, kill switch, limit seeding
 │   │   └── management/commands/  # seed_risk_defaults, kill_switch
-│   ├── tests/               # 536 pytest tests (28 risk + 113 broker + 73 market data)
+│   ├── engine/              # Phase 4: strategies, sizing, backtest/replay runner
+│   │   ├── strategies/      # sma_cross + donchian baselines + registry
+│   │   └── management/commands/  # backtest, replay
+│   ├── tests/               # 577 pytest tests (41 engine + 28 risk + 113 broker + 73 market data)
 │   └── requirements/        # base.txt / prod.txt / dev.txt (pinned)
 ├── docker/                  # Dockerfiles
 ├── .github/workflows/ci.yml # CI: lint, bandit, pip-audit, secrets, tests, deploy checks
 ├── pyproject.toml           # ruff / mypy / bandit / pytest / coverage config
-└── engine/  frontend/       # Phase 4+ (not yet created)
+└── engine/  frontend/       # Phase 5+ (not yet created)
 ```
 
 ## Paper Broker (Phase 2 — ₹10L paper, Zerodha-style costs, no naked shorts)
@@ -102,6 +105,22 @@ halt, 50 trades/day, mandatory stops, duplicate-signal guard, 10/min order
 rate, trading window (no entries before 09:20 or after 15:15 IST), kill
 switch, stale-tick guard. Exits are never trapped — only the kill switch
 blocks exits, and kill/EOD square-offs bypass with full audit.
+
+## Strategy Engine (Phase 4 — baselines + deterministic replay)
+
+```bash
+cd backend
+python manage.py backtest --account <UUID> --strategy sma_cross --symbols RELIANCE \
+  --start 2026-01-05T00:00:00+00:00 --end 2026-01-06T00:00:00+00:00
+python manage.py replay --account <UUID> --strategy donchian --symbols RELIANCE \
+  --start 2026-01-05T00:00:00+00:00 --end 2026-01-06T00:00:00+00:00
+```
+
+Strategies emit signals, never orders (`sma_cross`, `donchian` baselines).
+Sizing risks 1% of allocation per stop distance, rounded to lots; the same
+broker + risk code runs backtest (closed candles), replay (recorded ticks),
+and live paper — replaying a day twice gives byte-identical financials
+(the exit-gate test).
 
 ## Market Data (Phase 1 — free tier, zero keys)
 
@@ -139,7 +158,7 @@ Every one of these runs in CI and **blocks the merge on failure** — there are 
 | Static security | `bandit -r backend/ -c pyproject.toml` |
 | Dependency CVEs | `pip-audit` on `base.txt`, `prod.txt`, `dev.txt` |
 | Leaked secrets | `detect-secrets-hook` against `.secrets.baseline` |
-| Tests + coverage | `pytest` (coverage floor 80%, currently 90%) |
+| Tests + coverage | `pytest` (coverage floor 80%, currently 91%) |
 | Migration drift | `manage.py makemigrations --check --dry-run` |
 | Deploy readiness | `manage.py check --deploy --fail-level WARNING` |
 | Types | `mypy` with django-stubs |
@@ -185,7 +204,8 @@ This project treats security as a first-class concern:
 | 0. Foundations | ✅ Done — repo, Docker, CI, settings, Clock, models, instrument loader |
 | 1. Data Layer | ✅ Done — ticks/candles/providers/ingestion/quality on free tier (live 5-day proof pending) |
 | 2. Paper Broker Core | ✅ Done — fills, costs, margin, ledger, EOD (broker-calculator check is yours) |
-| 3. Risk Engine | 🔨 In Progress — 12 rules + kill switch built, needs your review |
+| 3. Risk Engine | ✅ Done — 12 rules + kill switch, every rule has a blocking test |
+| 4. Strategy Framework + Replay | 🔨 In Progress — baselines, sizing, deterministic runner built; needs your review |
 | 2. Paper Broker Core | ⏳ Planned |
 | 3. Risk Engine | ⏳ Planned |
 | 4. Strategy Framework | ⏳ Planned |

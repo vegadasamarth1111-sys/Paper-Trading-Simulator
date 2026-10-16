@@ -7,6 +7,7 @@ validated here moves to live trading by replacing a single module.
 """
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from decimal import Decimal
 
 from broker.fills import MarketSnapshot
@@ -39,6 +40,7 @@ class BrokerInterface(ABC):
         signal_id: str | None = None,
         stop_loss_price: Decimal | None = None,
         skip_risk: bool = False,
+        market_quote_ts: datetime | None = None,
     ) -> Order:
         """Validate, margin-check, and open an order. Returns the Order."""
         ...

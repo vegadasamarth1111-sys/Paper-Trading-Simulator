@@ -66,7 +66,7 @@ exclude_dirs = ["backend/tests", "backend/*/tests", "backend/venv", "venv"]
 skips = ["B101"]
 
 [tool.coverage.run]
-source = ["core", "security", "instruments", "market_data", "broker", "risk"]
+source = ["core", "security", "instruments", "market_data", "broker", "risk", "engine"]
 omit = ["*/migrations/*", "*/tests/*", "*/admin.py"]
 
 [tool.coverage.report]
