@@ -106,3 +106,25 @@ impossible — see below).
   never contain one: `detect-secrets-hook` blocks the commit otherwise.
 - Telegram alerts need `TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID` (free
   @BotFather bot). Unset = silent no-op; trading never depends on alerts.
+
+## 8. Documented simplifications (v1 trade-offs, reviewed, not hidden)
+
+1. **Dividends are NOT auto-credited** (plan §4.7 allowed deferring this).
+   The `DIV_CR` ledger entry type is reserved; positions held over a
+   dividend ex-date keep unadjusted quantities. Fine for paper (NSE cash
+   dividends are small versus strategy-PnL noise); revisit before testing
+   any dividend-capture strategy.
+2. **Splits/bonuses are NOT auto-applied to open paper positions.**
+   Raw prices stay unadjusted and `get_adjustment_factor()` serves
+   read-time adjustment, but an open position spanning an ex-date keeps
+   pre-split quantity/price. Avoid holding through splits in backtests,
+   or adjust manually and note it in the run record.
+3. **No Greeks/IV computation** (plan §5.6: analysis-only in v1 — here:
+   absent entirely). Fills never use them; nothing is lost.
+4. **Simplified SPAN** for F&O margin (see `broker/margin.py` header) —
+   blocks the underfunded trade; not an exchange SPAN replication.
+5. **Out-of-sample discipline:** tune on historical windows, report on a
+   final untouched period. The runner records params + data versions so
+   this is checkable, not honorable.
+6. **Free-tier data:** Yahoo is ~15-min delayed and unofficial; Angel
+   quotes need your keys. Nothing here is advertised as live-grade feed.

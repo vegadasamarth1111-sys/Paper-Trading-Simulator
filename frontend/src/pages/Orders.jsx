@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api';
 
 const EMPTY = { symbol: 'RELIANCE', side: 'BUY', order_type: 'MKT', quantity: 10, price: '', trigger_price: '', stop_loss_price: '' };
+const today = () => new Date().toISOString().slice(0, 10);
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
@@ -9,6 +10,7 @@ export default function Orders() {
   const [form, setForm] = useState(EMPTY);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const [csvDate, setCsvDate] = useState(today());
 
   async function load() {
     try {
@@ -50,6 +52,27 @@ export default function Orders() {
 
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value });
 
+  async function downloadCsv(e) {
+    e.preventDefault();
+    setError('');
+    try {
+      const token = localStorage.getItem('pts_access');
+      const res = await fetch(`/api/v1/reports/daily.csv?date=${csvDate}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `trades-${csvDate}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div>
       <h2>Orders &amp; trades</h2>
@@ -85,6 +108,13 @@ export default function Orders() {
             ))}
           </tbody>
         </table>
+      </div>
+      <div className="panel">
+        <h3>Daily report (CSV)</h3>
+        <form className="inline" onSubmit={downloadCsv}>
+          <input type="date" value={csvDate} onChange={(e) => setCsvDate(e.target.value)} required />
+          <button className="action" type="submit">Download trades CSV</button>
+        </form>
       </div>
       <div className="panel">
         <h3>Trades ({trades.length})</h3>
